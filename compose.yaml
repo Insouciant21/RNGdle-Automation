@@ -1,0 +1,43 @@
+services:
+  scheduler:
+    build: .
+    restart: unless-stopped
+    env_file: [.env]
+    volumes:
+      - ./config/config.yaml:/app/config/config.yaml:ro
+      - rngdle-data:/app/data
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/status').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  auth:
+    build: .
+    profiles: [tools]
+    stdin_open: true
+    tty: true
+    command: ["node", "src/index.js", "auth"]
+    env_file: [.env]
+    volumes:
+      - ./config/config.yaml:/app/config/config.yaml:ro
+      - rngdle-data:/app/data
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  once:
+    build: .
+    profiles: [tools]
+    command: ["node", "src/index.js", "once"]
+    env_file: [.env]
+    volumes:
+      - ./config/config.yaml:/app/config/config.yaml:ro
+      - rngdle-data:/app/data
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  rngdle-data:

@@ -1,0 +1,42 @@
+timezone: "${TZ:-Asia/Shanghai}"
+
+schedule:
+  time: "${SCHEDULE_TIME:-08:02}"
+  retryMinutes: "${RETRY_MINUTES:-30}"
+  pollSeconds: "${POLL_SECONDS:-30}"
+
+rngdle:
+  baseUrl: "${RNGDLE_BASE_URL:-https://www.rngdle.com}"
+  email: "${RNGDLE_EMAIL}"
+
+browser:
+  headless: "${BROWSER_HEADLESS:-true}"
+  timeoutMs: "${BROWSER_TIMEOUT_MS:-45000}"
+
+control:
+  port: "${CONTROL_PORT:-3000}"
+  # Used in login-expiry notification emails. For a remote host, use an SSH
+  # tunnel or a private HTTPS URL rather than exposing the page publicly.
+  publicUrl: "${CONTROL_PUBLIC_URL:-http://localhost:3000}"
+
+smtp:
+  host: "${SMTP_HOST:-smtp.gmail.com}"
+  port: "${SMTP_PORT:-587}"
+  secure: "${SMTP_SECURE:-false}"
+  requireTls: "${SMTP_REQUIRE_TLS:-true}"
+  authMode: "${SMTP_AUTH_MODE:-password}"
+  username: "${SMTP_USER}"
+  password: "${SMTP_APP_PASSWORD:-}"
+  oauth:
+    clientId: "${SMTP_OAUTH_CLIENT_ID:-}"
+    clientSecret: "${SMTP_OAUTH_CLIENT_SECRET:-}"
+    refreshToken: "${SMTP_OAUTH_REFRESH_TOKEN:-}"
+    tenantId: "${SMTP_OAUTH_TENANT_ID:-consumers}"
+  from: "${MAIL_FROM:-}"
+  to: "${MAIL_TO}"
+
+mail:
+  subjectPrefix: "${MAIL_SUBJECT_PREFIX:-[RNGdle]}"
+
+storage:
+  directory: ./data
