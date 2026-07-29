@@ -70,6 +70,8 @@ test("control APIs expose operations without exposing secrets", async (context) 
   assert.match(page, /@font-face/);
   assert.match(page, /\/assets\/fonts\/inter-latin\.woff2/);
   assert.match(page, /id="email-send"/);
+  assert.match(page, /<header class="topbar">[\s\S]*<nav class="tabs"[\s\S]*<\/header>/);
+  assert.doesNotMatch(page, /tabs-wrap/);
   const font = await fetch(`${baseUrl}/assets/fonts/space-mono-700-latin.woff2`);
   assert.equal(font.status, 200);
   assert.equal(font.headers.get("content-type"), "font/woff2");

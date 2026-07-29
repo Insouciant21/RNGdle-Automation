@@ -160,7 +160,9 @@ Control 的 Settings 页面会将修改写入 `/app/data/settings.json`，其优
 
 ## Control 页面
 
-Control 使用四个独立视图：
+Control 将品牌、四视图导航和 scheduler 状态集中在页面 header 中。移动端导航保留在 header 第二行，四个入口等宽排列。
+
+四个视图分别提供：
 
 | 视图 | 功能 |
 | --- | --- |

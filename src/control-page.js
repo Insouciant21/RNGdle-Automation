@@ -30,18 +30,17 @@ export function renderControlPage(baseUrl) {
     html,body { min-height:100%; }
     body { margin:0; background:var(--site); color:var(--prose); font:14px/1.5 var(--font-sans); letter-spacing:0; }
     button,input,select { font:inherit; }
-    .topbar { min-height:49px; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:7px 16px; border-bottom:1px solid var(--outline); background:var(--site); }
-    .brand { display:inline-flex; align-items:center; gap:9px; color:var(--prose); font-size:17px; font-weight:800; text-decoration:none; }
+    .topbar { min-height:50px; display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:stretch; gap:12px; padding:0 16px; border-bottom:1px solid var(--outline); background:var(--site); }
+    .brand { grid-column:1; display:inline-flex; align-items:center; justify-self:start; gap:9px; color:var(--prose); font-size:17px; font-weight:800; text-decoration:none; }
     .brand img { width:24px; height:24px; border-radius:5px; }
     .brand-context,.mono,.label { font-family:var(--font-mono); }
     .brand-context { color:var(--prose-3); font-size:10px; text-transform:uppercase; }
-    .header-state { display:flex; align-items:center; gap:8px; min-width:0; color:var(--prose-2); font:700 11px/1.2 var(--font-mono); text-transform:uppercase; }
+    .header-state { grid-column:3; display:flex; align-items:center; justify-self:end; gap:8px; min-width:0; color:var(--prose-2); font:700 11px/1.2 var(--font-mono); text-align:right; text-transform:uppercase; }
     .dot { flex:0 0 auto; width:8px; height:8px; border-radius:50%; background:var(--prose-3); }
     .dot.waiting,.dot.error { background:var(--danger); }
     .dot.authenticated,.dot.idle,.dot.success { background:var(--success); }
-    .tabs-wrap { border-bottom:1px solid var(--outline); background:var(--surface); overflow-x:auto; }
-    .tabs { display:flex; width:max-content; min-width:100%; max-width:1080px; margin:0 auto; padding:0 18px; }
-    .tab { min-width:96px; min-height:43px; padding:10px 14px; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--prose-3); font:700 11px/1.2 var(--font-mono); text-transform:uppercase; cursor:pointer; }
+    .tabs { grid-column:2; display:flex; align-self:stretch; justify-content:center; min-width:0; }
+    .tab { min-width:96px; min-height:49px; padding:10px 14px; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--prose-3); font:700 11px/1.2 var(--font-mono); text-transform:uppercase; cursor:pointer; }
     .tab:hover { color:var(--prose); background:var(--raised); }
     .tab.active { border-bottom-color:var(--prose); color:var(--prose); }
     main { width:100%; max-width:1040px; margin:0 auto; padding:36px 20px 56px; }
@@ -115,21 +114,21 @@ export function renderControlPage(baseUrl) {
     .form-field .field-label { margin:0 0 6px; }
     .settings-actions { display:flex; align-items:center; justify-content:flex-end; gap:14px; padding-top:20px; }
     .secret-state { color:var(--success); }
-    @media (max-width:760px) { main { padding:28px 16px 44px; } .overview-grid { grid-template-columns:1fr; } .settings-group { grid-template-columns:1fr; gap:14px; } .log-row { grid-template-columns:1fr auto; gap:4px 10px; } .log-message,.log-fields { grid-column:1/-1; } .log-panel { height:460px; } .email-heading { align-items:stretch; flex-direction:column; } .email-actions { justify-content:flex-start; } .email-feedback { text-align:left; } .preview-frame { height:720px; } }
-    @media (max-width:520px) { .topbar { padding:7px 10px; } .brand-context { display:none; } .header-state { max-width:50%; text-align:right; } .tabs { padding:0 8px; } .tab { min-width:84px; padding:10px; } main { padding:24px 12px 36px; } .status-hero { padding-top:4px; } .status-frame { min-height:82px; } .status-copy { font-size:21px; } .stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .stat:nth-child(3) { border-left:0; } .stat:nth-child(n+3) { border-top:1px solid var(--outline); } .form-grid { grid-template-columns:1fr; } .form-field.full { grid-column:auto; } .settings-actions { align-items:stretch; flex-direction:column; } .settings-actions .button { width:100%; } .toolbar { align-items:stretch; flex-direction:column; } .toolbar-group { justify-content:space-between; } .email-actions .segmented { width:100%; } .email-actions .segment { flex:1; } .email-actions .button { flex:1; } .preview-frame { height:660px; } }
+    @media (max-width:760px) { .topbar { grid-template-columns:minmax(0,1fr) auto; gap:0; padding:0; } .brand { grid-column:1; grid-row:1; min-height:49px; padding:7px 12px; } .header-state { grid-column:2; grid-row:1; min-height:49px; padding:7px 12px; } .tabs { grid-column:1/-1; grid-row:2; width:100%; border-top:1px solid var(--outline); overflow-x:auto; } .tab { flex:1 0 78px; min-width:78px; min-height:43px; padding:10px 8px; } main { padding:28px 16px 44px; } .overview-grid { grid-template-columns:1fr; } .settings-group { grid-template-columns:1fr; gap:14px; } .log-row { grid-template-columns:1fr auto; gap:4px 10px; } .log-message,.log-fields { grid-column:1/-1; } .log-panel { height:460px; } .email-heading { align-items:stretch; flex-direction:column; } .email-actions { justify-content:flex-start; } .email-feedback { text-align:left; } .preview-frame { height:720px; } }
+    @media (max-width:520px) { .brand-context { display:none; } .header-state { max-width:100%; } main { padding:24px 12px 36px; } .status-hero { padding-top:4px; } .status-frame { min-height:82px; } .status-copy { font-size:21px; } .stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .stat:nth-child(3) { border-left:0; } .stat:nth-child(n+3) { border-top:1px solid var(--outline); } .form-grid { grid-template-columns:1fr; } .form-field.full { grid-column:auto; } .settings-actions { align-items:stretch; flex-direction:column; } .settings-actions .button { width:100%; } .toolbar { align-items:stretch; flex-direction:column; } .toolbar-group { justify-content:space-between; } .email-actions .segmented { width:100%; } .email-actions .segment { flex:1; } .email-actions .button { flex:1; } .preview-frame { height:660px; } }
   </style>
 </head>
 <body>
   <header class="topbar">
     <a id="brand-link" class="brand" href="${rngdleUrl}" target="_blank" rel="noopener noreferrer"><img src="${iconUrl}" alt=""><span>RNGdle</span><span class="brand-context">Control</span></a>
+    <nav class="tabs" role="tablist" aria-label="Control views">
+      <button class="tab active" role="tab" aria-selected="true" data-view="overview">Overview</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="logs">Logs</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="email">Email</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="settings">Settings</button>
+    </nav>
     <div class="header-state"><span id="header-dot" class="dot"></span><span id="header-status">Connecting</span></div>
   </header>
-  <div class="tabs-wrap"><nav class="tabs" role="tablist" aria-label="Control views">
-    <button class="tab active" role="tab" aria-selected="true" data-view="overview">Overview</button>
-    <button class="tab" role="tab" aria-selected="false" data-view="logs">Logs</button>
-    <button class="tab" role="tab" aria-selected="false" data-view="email">Email</button>
-    <button class="tab" role="tab" aria-selected="false" data-view="settings">Settings</button>
-  </nav></div>
   <main>
     <section id="view-overview" class="view" role="tabpanel">
       <div class="status-hero">
