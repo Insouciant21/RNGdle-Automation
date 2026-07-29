@@ -52,13 +52,24 @@ test("control APIs expose operations without exposing secrets", async (context) 
     mail: { subjectPrefix: "[RNGdle]" },
     storage: { statePath, settingsPath: path.join(directory, "settings.json") },
   };
-  const control = await createControlServer(config);
+  const sent = [];
+  const control = await createControlServer(config, {
+    sendRoll: async (_config, date, result) => {
+      sent.push({ type: "result", date, number: result.number });
+      return { messageId: "test-result" };
+    },
+    sendAuthentication: async () => {
+      sent.push({ type: "authentication" });
+      return { messageId: "test-authentication" };
+    },
+  });
   context.after(() => control.close());
   const baseUrl = `http://127.0.0.1:${control.address().port}`;
 
   const page = await (await fetch(baseUrl)).text();
   assert.match(page, /@font-face/);
   assert.match(page, /\/assets\/fonts\/inter-latin\.woff2/);
+  assert.match(page, /id="email-send"/);
   const font = await fetch(`${baseUrl}/assets/fonts/space-mono-700-latin.woff2`);
   assert.equal(font.status, 200);
   assert.equal(font.headers.get("content-type"), "font/woff2");
@@ -96,6 +107,30 @@ test("control APIs expose operations without exposing secrets", async (context) 
   const invalidPreview = await fetch(`${baseUrl}/preview/email?type=unknown`);
   assert.equal(invalidPreview.status, 400);
 
+  const rejectedEmail = await fetch(`${baseUrl}/api/email/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: "https://example.org" },
+    body: JSON.stringify({ type: "result" }),
+  });
+  assert.equal(rejectedEmail.status, 403);
+
+  const resultEmail = await fetch(`${baseUrl}/api/email/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: baseUrl },
+    body: JSON.stringify({ type: "result" }),
+  });
+  assert.equal(resultEmail.status, 200);
+  assert.deepEqual(sent.at(-1), { type: "result", date: "2026-07-29", number: 123456 });
+
+  const authenticationEmail = await fetch(`${baseUrl}/api/email/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: baseUrl },
+    body: JSON.stringify({ type: "authentication" }),
+  });
+  assert.equal(authenticationEmail.status, 200);
+  assert.deepEqual(sent.at(-1), { type: "authentication" });
+
   const logs = await (await fetch(`${baseUrl}/api/logs?level=info`)).json();
   assert.ok(logs.logs.some((entry) => entry.message === "Control page started"));
+  assert.ok(logs.logs.some((entry) => entry.message === "Control email sent"));
 });

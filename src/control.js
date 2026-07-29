@@ -2,11 +2,17 @@ import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { renderControlPage } from "./control-page.js";
 import { errorSummary, getRecentLogs, log } from "./logger.js";
-import { buildAuthenticationRequiredMessage, buildRollMessage } from "./mail.js";
+import {
+  buildAuthenticationRequiredMessage,
+  buildRollMessage,
+  sendAuthenticationRequiredEmail,
+  sendRollEmail,
+} from "./mail.js";
 import { publicSettings, saveRuntimeSettings } from "./settings.js";
 import { readState } from "./state.js";
 
 const MAX_BODY_BYTES = 32 * 1024;
+const EMAIL_TYPES = new Set(["result", "authentication"]);
 const FONT_ASSETS = new Map([
   [
     "/assets/fonts/inter-latin.woff2",
@@ -124,20 +130,28 @@ async function overviewPayload(config, status) {
   };
 }
 
-async function emailPreview(config, type, requestedDate) {
-  if (type === "authentication") return buildAuthenticationRequiredMessage(config).html;
+async function selectedResult(config, requestedDate) {
   const state = await readState(config.storage.statePath);
-  const selected = requestedDate
+  return requestedDate
     ? state.days[requestedDate]?.result
       ? { date: requestedDate, day: state.days[requestedDate] }
       : null
     : newestDay(state, (day) => Boolean(day.result));
+}
+
+async function emailPreview(config, type, requestedDate) {
+  if (type === "authentication") return buildAuthenticationRequiredMessage(config).html;
+  const selected = await selectedResult(config, requestedDate);
   if (!selected) return null;
   return buildRollMessage(config, selected.date, selected.day.result).html;
 }
 
-export async function createControlServer(config) {
+export async function createControlServer(
+  config,
+  { sendRoll = sendRollEmail, sendAuthentication = sendAuthenticationRequiredEmail } = {},
+) {
   let status = { state: "idle", label: "Scheduler ready" };
+  let emailSendInFlight = false;
   const linkListeners = new Set();
   const page = renderControlPage(config.rngdle.baseUrl);
 
@@ -179,7 +193,7 @@ export async function createControlServer(config) {
         sendJson(response, 200, { message: "Settings saved and applied.", settings });
       } else if (request.method === "GET" && url.pathname === "/preview/email") {
         const previewType = url.searchParams.get("type") ?? "result";
-        if (!new Set(["result", "authentication"]).has(previewType)) throw new Error("Invalid email preview type");
+        if (!EMAIL_TYPES.has(previewType)) throw new Error("Invalid email preview type");
         const preview = await emailPreview(config, previewType, url.searchParams.get("date"));
         if (!preview) {
           sendHtml(response, 404, "<!doctype html><html><body><p>No roll result is available.</p></body></html>", {
@@ -187,6 +201,50 @@ export async function createControlServer(config) {
           });
         } else {
           sendHtml(response, 200, preview, { preview: true });
+        }
+      } else if (request.method === "POST" && url.pathname === "/api/email/send") {
+        if (!isSameOriginRequest(request)) {
+          sendJson(response, 403, { message: "Cross-origin email requests are not allowed." });
+          return;
+        }
+        if (emailSendInFlight) {
+          sendJson(response, 409, { message: "An email is already being sent." });
+          return;
+        }
+        const { type = "result", date = null } = await readJson(request);
+        if (!EMAIL_TYPES.has(type)) throw new Error("Invalid email type");
+        if (date !== null && (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date))) {
+          throw new Error("Email date must use YYYY-MM-DD format");
+        }
+        const selected = type === "result" ? await selectedResult(config, date) : null;
+        if (type === "result" && !selected) {
+          sendJson(response, 404, { message: "No roll result is available to send." });
+          return;
+        }
+        emailSendInFlight = true;
+        try {
+          const info =
+            type === "authentication"
+              ? await sendAuthentication(config)
+              : await sendRoll(config, selected.date, selected.day.result);
+          const sentDate = selected?.date ?? null;
+          log("info", "Control email sent", {
+            type,
+            date: sentDate,
+            recipientCount: config.smtp.to.length,
+            messageId: info?.messageId ?? null,
+          });
+          sendJson(response, 200, {
+            message: `${type === "result" ? "Result" : "Login required"} email sent.`,
+            type,
+            date: sentDate,
+          });
+        } catch (error) {
+          const summary = errorSummary(error);
+          log("error", "Control email send failed", { type, error: summary });
+          sendJson(response, 502, { message: `Email send failed: ${summary}` });
+        } finally {
+          emailSendInFlight = false;
         }
       } else if (request.method === "POST" && url.pathname === "/api/auth-link") {
         if (!isSameOriginRequest(request)) {

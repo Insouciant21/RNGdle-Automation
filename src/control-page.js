@@ -101,6 +101,9 @@ export function renderControlPage(baseUrl) {
     .segment { min-height:38px; padding:8px 12px; border:0; background:transparent; color:var(--prose-3); font:700 10px/1.3 var(--font-mono); text-transform:uppercase; cursor:pointer; }
     .segment + .segment { border-left:1px solid var(--outline); }
     .segment.active { background:var(--prose); color:var(--surface); }
+    .email-heading { align-items:flex-end; }
+    .email-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; }
+    .email-feedback { margin:0 0 10px; text-align:right; }
     .preview-frame { display:block; width:100%; height:820px; border:1px solid var(--outline); border-radius:8px; background:#fafafa; }
     .settings-form { border-top:1px solid var(--outline); }
     .settings-group { display:grid; grid-template-columns:190px minmax(0,1fr); gap:28px; padding:24px 0; border-bottom:1px solid var(--outline); }
@@ -112,8 +115,8 @@ export function renderControlPage(baseUrl) {
     .form-field .field-label { margin:0 0 6px; }
     .settings-actions { display:flex; align-items:center; justify-content:flex-end; gap:14px; padding-top:20px; }
     .secret-state { color:var(--success); }
-    @media (max-width:760px) { main { padding:28px 16px 44px; } .overview-grid { grid-template-columns:1fr; } .settings-group { grid-template-columns:1fr; gap:14px; } .log-row { grid-template-columns:1fr auto; gap:4px 10px; } .log-message,.log-fields { grid-column:1/-1; } .log-panel { height:460px; } .preview-frame { height:720px; } }
-    @media (max-width:520px) { .topbar { padding:7px 10px; } .brand-context { display:none; } .header-state { max-width:50%; text-align:right; } .tabs { padding:0 8px; } .tab { min-width:84px; padding:10px; } main { padding:24px 12px 36px; } .status-hero { padding-top:4px; } .status-frame { min-height:82px; } .status-copy { font-size:21px; } .stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .stat:nth-child(3) { border-left:0; } .stat:nth-child(n+3) { border-top:1px solid var(--outline); } .form-grid { grid-template-columns:1fr; } .form-field.full { grid-column:auto; } .settings-actions { align-items:stretch; flex-direction:column; } .settings-actions .button { width:100%; } .toolbar { align-items:stretch; flex-direction:column; } .toolbar-group { justify-content:space-between; } .preview-frame { height:660px; } }
+    @media (max-width:760px) { main { padding:28px 16px 44px; } .overview-grid { grid-template-columns:1fr; } .settings-group { grid-template-columns:1fr; gap:14px; } .log-row { grid-template-columns:1fr auto; gap:4px 10px; } .log-message,.log-fields { grid-column:1/-1; } .log-panel { height:460px; } .email-heading { align-items:stretch; flex-direction:column; } .email-actions { justify-content:flex-start; } .email-feedback { text-align:left; } .preview-frame { height:720px; } }
+    @media (max-width:520px) { .topbar { padding:7px 10px; } .brand-context { display:none; } .header-state { max-width:50%; text-align:right; } .tabs { padding:0 8px; } .tab { min-width:84px; padding:10px; } main { padding:24px 12px 36px; } .status-hero { padding-top:4px; } .status-frame { min-height:82px; } .status-copy { font-size:21px; } .stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .stat:nth-child(3) { border-left:0; } .stat:nth-child(n+3) { border-top:1px solid var(--outline); } .form-grid { grid-template-columns:1fr; } .form-field.full { grid-column:auto; } .settings-actions { align-items:stretch; flex-direction:column; } .settings-actions .button { width:100%; } .toolbar { align-items:stretch; flex-direction:column; } .toolbar-group { justify-content:space-between; } .email-actions .segmented { width:100%; } .email-actions .segment { flex:1; } .email-actions .button { flex:1; } .preview-frame { height:660px; } }
   </style>
 </head>
 <body>
@@ -191,10 +194,11 @@ export function renderControlPage(baseUrl) {
     </section>
 
     <section id="view-email" class="view" role="tabpanel" hidden>
-      <div class="section-heading">
+      <div class="section-heading email-heading">
         <div><h1 class="view-title">Email preview</h1><p class="view-kicker" style="margin-bottom:0">Rendered message output</p></div>
-        <div class="toolbar-group"><div class="segmented" role="group" aria-label="Email type"><button class="segment active" type="button" data-email-type="result">Result</button><button class="segment" type="button" data-email-type="authentication">Login required</button></div><a id="preview-open" class="button quiet" href="/preview/email?type=result" target="_blank">Open</a></div>
+        <div class="email-actions"><div class="segmented" role="group" aria-label="Email type"><button class="segment active" type="button" data-email-type="result">Result</button><button class="segment" type="button" data-email-type="authentication">Login required</button></div><button id="email-send" class="button" type="button">Send email</button><a id="preview-open" class="button quiet" href="/preview/email?type=result" target="_blank">Open</a></div>
       </div>
+      <div id="email-message" class="feedback email-feedback" role="status"></div>
       <iframe id="email-frame" class="preview-frame" title="Email preview" src="/preview/email?type=result"></iframe>
     </section>
 
@@ -238,6 +242,8 @@ export function renderControlPage(baseUrl) {
   <script>
     const byId = (id) => document.getElementById(id);
     let activeView = 'overview';
+    let selectedEmailType = 'result';
+    let mailRecipients = [];
     let settingsLoaded = false;
 
     async function request(url, options) {
@@ -273,7 +279,8 @@ export function renderControlPage(baseUrl) {
         byId('rngdle-link').href = data.rngdle.baseUrl;
         byId('brand-link').href = data.rngdle.baseUrl;
         byId('auth-submit').disabled = state !== 'waiting';
-        text('mail-recipients', data.mail.to.join(', '));
+        mailRecipients = data.mail.to;
+        text('mail-recipients', mailRecipients.join(', '));
         if (data.result) {
           text('result-date', data.result.date);
           text('roll-number', data.result.number);
@@ -329,7 +336,8 @@ export function renderControlPage(baseUrl) {
     document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click',()=>showView(tab.dataset.view)));
     byId('auth-form').addEventListener('submit',async(event)=>{ event.preventDefault(); const message=byId('auth-message'); message.className='feedback'; message.textContent=''; byId('auth-submit').disabled=true; try { const data=await request('/api/auth-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({link:byId('auth-link').value})}); message.textContent=data.message; byId('auth-link').value=''; } catch(error) { message.className='feedback error'; message.textContent=error.message; } await refreshOverview(); });
     byId('log-refresh').addEventListener('click',loadLogs); byId('log-level').addEventListener('change',loadLogs);
-    document.querySelectorAll('[data-email-type]').forEach((button)=>button.addEventListener('click',()=>{ document.querySelectorAll('[data-email-type]').forEach((item)=>item.classList.toggle('active',item===button)); const url='/preview/email?type='+encodeURIComponent(button.dataset.emailType)+'&t='+Date.now(); byId('email-frame').src=url; byId('preview-open').href=url; }));
+    document.querySelectorAll('[data-email-type]').forEach((button)=>button.addEventListener('click',()=>{ selectedEmailType=button.dataset.emailType; document.querySelectorAll('[data-email-type]').forEach((item)=>item.classList.toggle('active',item===button)); const url='/preview/email?type='+encodeURIComponent(selectedEmailType)+'&t='+Date.now(); byId('email-frame').src=url; byId('preview-open').href=url; byId('email-message').textContent=''; }));
+    byId('email-send').addEventListener('click',async()=>{ const recipients=mailRecipients.length ? mailRecipients.join(', ') : 'the configured recipients'; const label=selectedEmailType==='result' ? 'result' : 'login required'; if(!window.confirm('Send the '+label+' email to '+recipients+'?')) return; const button=byId('email-send'); const message=byId('email-message'); button.disabled=true; button.textContent='Sending'; message.className='feedback email-feedback'; message.textContent=''; try { const data=await request('/api/email/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:selectedEmailType})}); message.textContent=data.message; } catch(error) { message.className='feedback email-feedback error'; message.textContent=error.message; } finally { button.disabled=false; button.textContent='Send email'; } });
     byId('settings-form').addEventListener('submit',async(event)=>{ event.preventDefault(); const message=byId('settings-message'); const save=byId('settings-save'); message.className='feedback'; message.textContent=''; save.disabled=true; const payload={timezone:byId('timezone').value,scheduleTime:byId('schedule-time').value,retryMinutes:Number(byId('retry-minutes').value),pollSeconds:Number(byId('poll-seconds').value),browserTimeoutMs:Number(byId('browser-timeout').value),controlPublicUrl:byId('control-url').value,rngdleEmail:byId('rngdle-email').value,smtpUsername:byId('smtp-username').value,smtpFrom:byId('smtp-from').value,mailSubjectPrefix:byId('subject-prefix').value,mailTo:byId('mail-to').value,smtpHost:byId('smtp-host').value,smtpPort:Number(byId('smtp-port').value),smtpSecure:byId('smtp-secure').checked,smtpRequireTls:byId('smtp-require-tls').checked,smtpAppPassword:byId('smtp-password').value}; try { const data=await request('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); message.textContent=data.message; settingsLoaded=false; await loadSettings(); await refreshOverview(); } catch(error) { message.className='feedback error'; message.textContent=error.message; } finally { save.disabled=false; } });
     setInterval(()=>{ refreshOverview(); if(activeView==='logs'&&byId('log-auto').checked) loadLogs(); },3000);
     refreshOverview();

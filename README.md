@@ -166,8 +166,10 @@ Control 使用四个独立视图：
 | --- | --- |
 | `Overview` | Scheduler 状态、最近 roll、EP、badges、邮件状态、重试信息和 RNGdle 认证 |
 | `Logs` | 当前进程最近 250 条结构化日志、级别筛选、手动与自动刷新 |
-| `Email` | 预览最近结果邮件或登录失效邮件；预览不会发送邮件 |
+| `Email` | 预览并手动发送最近结果邮件或登录失效邮件 |
 | `Settings` | 热更新调度、浏览器超时、账号、收件人、主题和 Gmail SMTP 参数 |
+
+![RNGdle Control email](docs/control-email.png)
 
 ![RNGdle Control logs](docs/control-logs.png)
 
@@ -183,7 +185,7 @@ Control 使用四个独立视图：
 
 Settings 中的 App Password 输入始终为空，只显示 `(configured)` 或 `(missing)`。留空保存会保留现有密码；输入新值才会替换。设置文件使用 `0600` 权限原子写入。
 
-Logs 只保留当前 scheduler 进程最近 250 条记录，容器重启后清空；需要长期历史时使用 `docker compose logs` 或配置 Docker 日志驱动。Email 视图只渲染已有数据，不会发送测试邮件，也不会改变每日任务状态。
+Logs 只保留当前 scheduler 进程最近 250 条记录，容器重启后清空；需要长期历史时使用 `docker compose logs` 或配置 Docker 日志驱动。Email 视图发送前会确认当前模板和收件人；手动发送会写入日志，但不会改变每日任务状态。
 
 Control 页面使用的本地 API：
 
@@ -194,6 +196,7 @@ Control 页面使用的本地 API：
 | `GET /api/settings` | 返回可编辑配置，不包含 SMTP 密码 |
 | `PUT /api/settings` | 校验、持久化并立即应用配置 |
 | `GET /preview/email` | 渲染 `result` 或 `authentication` 邮件预览 |
+| `POST /api/email/send` | 手动发送当前结果或登录失效邮件 |
 | `POST /api/auth-link` | 在等待认证时提交 RNGdle magic link |
 
 页面默认只通过 Compose 绑定到 `127.0.0.1:3000`。远程主机应使用 SSH 隧道：
