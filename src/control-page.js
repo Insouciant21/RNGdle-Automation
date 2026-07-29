@@ -20,6 +20,7 @@ export function renderControlPage(baseUrl) {
   <link rel="preload" href="/assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/assets/fonts/space-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/assets/fonts/space-mono-700-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/vendor/perfect-scrollbar.css">
   <style>
     @font-face { font-family:Inter; font-style:normal; font-display:swap; font-weight:100 900; src:url("/assets/fonts/inter-latin.woff2") format("woff2"); }
     @font-face { font-family:"Space Mono"; font-style:normal; font-display:swap; font-weight:400; src:url("/assets/fonts/space-mono-400-latin.woff2") format("woff2"); }
@@ -27,10 +28,10 @@ export function renderControlPage(baseUrl) {
     :root { color-scheme:light; --font-sans:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; --font-mono:"Space Mono",ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace; --site:#fafafa; --surface:#fff; --raised:#f3f4f6; --prose:#111827; --prose-2:#4b5563; --prose-3:#9ca3af; --outline:#e5e7eb; --strong:#9ca3af; --success:#047857; --danger:#dc2626; --warning:#c2410c; }
     @media (prefers-color-scheme:dark) { :root { color-scheme:dark; --site:#19181d; --surface:#25242a; --raised:#302f36; --prose:#f0f0f0; --prose-2:#c4c4c4; --prose-3:#9a9a9a; --outline:#52515a; --strong:#85838f; --success:#6ee7b7; --danger:#fca5a5; --warning:#fdba74; } }
     * { box-sizing:border-box; }
-    html,body { min-height:100%; }
-    body { margin:0; background:var(--site); color:var(--prose); font:14px/1.5 var(--font-sans); letter-spacing:0; }
+    html,body { height:100%; min-height:100%; }
+    body { display:flex; flex-direction:column; margin:0; overflow:hidden; background:var(--site); color:var(--prose); font:14px/1.5 var(--font-sans); letter-spacing:0; }
     button,input,select { font:inherit; }
-    .topbar { min-height:50px; display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:stretch; gap:12px; padding:0 16px; border-bottom:1px solid var(--outline); background:var(--site); }
+    .topbar { flex:0 0 auto; min-height:50px; display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:stretch; gap:12px; padding:0 16px; border-bottom:1px solid var(--outline); background:var(--site); }
     .brand { grid-column:1; display:inline-flex; align-items:center; justify-self:start; gap:9px; color:var(--prose); font-size:17px; font-weight:800; text-decoration:none; }
     .brand img { width:24px; height:24px; border-radius:5px; }
     .brand-context,.mono,.label { font-family:var(--font-mono); }
@@ -43,6 +44,7 @@ export function renderControlPage(baseUrl) {
     .tab { min-width:96px; min-height:49px; padding:10px 14px; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--prose-3); font:700 11px/1.2 var(--font-mono); text-transform:uppercase; cursor:pointer; }
     .tab:hover { color:var(--prose); background:var(--raised); }
     .tab.active { border-bottom-color:var(--prose); color:var(--prose); }
+    .main-scroll { position:relative; flex:1 1 auto; min-height:0; overflow:auto; }
     main { width:100%; max-width:1040px; margin:0 auto; padding:36px 20px 56px; }
     .view[hidden] { display:none; }
     .view-title { margin:0; font-size:20px; line-height:1.3; text-transform:uppercase; }
@@ -88,7 +90,7 @@ export function renderControlPage(baseUrl) {
     .toolbar .select { width:auto; min-width:120px; min-height:38px; }
     .check { display:inline-flex; align-items:center; gap:7px; color:var(--prose-2); font:700 10px/1.3 var(--font-mono); text-transform:uppercase; }
     .check input { width:16px; height:16px; margin:0; accent-color:var(--prose); }
-    .log-panel { height:520px; border:1px solid var(--outline); border-radius:8px; background:var(--surface); overflow:auto; }
+    .log-panel { contain:paint; height:520px; border:1px solid var(--outline); border-radius:8px; background:var(--surface); overflow:auto; }
     .log-empty { padding:40px 18px; color:var(--prose-3); font:12px/1.5 var(--font-mono); text-align:center; }
     .log-row { display:grid; grid-template-columns:168px 58px minmax(0,1fr); gap:12px; padding:10px 12px; border-bottom:1px solid var(--outline); font:11px/1.45 var(--font-mono); }
     .log-time { color:var(--prose-3); }
@@ -114,6 +116,14 @@ export function renderControlPage(baseUrl) {
     .form-field .field-label { margin:0 0 6px; }
     .settings-actions { display:flex; align-items:center; justify-content:flex-end; gap:14px; padding-top:20px; }
     .secret-state { color:var(--success); }
+    .main-scroll.ps,.log-panel.ps { overflow:hidden !important; }
+    .ps--active-y > .ps__rail-y { width:10px; opacity:.5; background:transparent; z-index:20; }
+    .ps--active-x > .ps__rail-x { height:10px; opacity:.5; background:transparent; z-index:20; }
+    .ps .ps__rail-y:hover,.ps .ps__rail-y:focus,.ps .ps__rail-y.ps--clicking,.ps .ps__rail-x:hover,.ps .ps__rail-x:focus,.ps .ps__rail-x.ps--clicking { opacity:1; background:var(--raised); }
+    .ps__thumb-y { right:2px; width:5px; border-radius:4px; background:var(--strong); }
+    .ps__thumb-x { bottom:2px; height:5px; border-radius:4px; background:var(--strong); }
+    .ps__rail-y:hover > .ps__thumb-y,.ps__rail-y:focus > .ps__thumb-y,.ps__rail-y.ps--clicking .ps__thumb-y { width:5px; background:var(--prose-2); }
+    .ps__rail-x:hover > .ps__thumb-x,.ps__rail-x:focus > .ps__thumb-x,.ps__rail-x.ps--clicking .ps__thumb-x { height:5px; background:var(--prose-2); }
     @media (max-width:760px) { .topbar { grid-template-columns:minmax(0,1fr) auto; gap:0; padding:0; } .brand { grid-column:1; grid-row:1; min-height:49px; padding:7px 12px; } .header-state { grid-column:2; grid-row:1; min-height:49px; padding:7px 12px; } .tabs { grid-column:1/-1; grid-row:2; width:100%; border-top:1px solid var(--outline); overflow-x:auto; } .tab { flex:1 0 78px; min-width:78px; min-height:43px; padding:10px 8px; } main { padding:28px 16px 44px; } .overview-grid { grid-template-columns:1fr; } .settings-group { grid-template-columns:1fr; gap:14px; } .log-row { grid-template-columns:1fr auto; gap:4px 10px; } .log-message,.log-fields { grid-column:1/-1; } .log-panel { height:460px; } .email-heading { align-items:stretch; flex-direction:column; } .email-actions { justify-content:flex-start; } .email-feedback { text-align:left; } .preview-frame { height:720px; } }
     @media (max-width:520px) { .brand-context { display:none; } .header-state { max-width:100%; } main { padding:24px 12px 36px; } .status-hero { padding-top:4px; } .status-frame { min-height:82px; } .status-copy { font-size:21px; } .stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .stat:nth-child(3) { border-left:0; } .stat:nth-child(n+3) { border-top:1px solid var(--outline); } .form-grid { grid-template-columns:1fr; } .form-field.full { grid-column:auto; } .settings-actions { align-items:stretch; flex-direction:column; } .settings-actions .button { width:100%; } .toolbar { align-items:stretch; flex-direction:column; } .toolbar-group { justify-content:space-between; } .email-actions .segmented { width:100%; } .email-actions .segment { flex:1; } .email-actions .button { flex:1; } .preview-frame { height:660px; } }
   </style>
@@ -129,6 +139,7 @@ export function renderControlPage(baseUrl) {
     </nav>
     <div class="header-state"><span id="header-dot" class="dot"></span><span id="header-status">Connecting</span></div>
   </header>
+  <div id="main-scroll" class="main-scroll" tabindex="0">
   <main>
     <section id="view-overview" class="view" role="tabpanel">
       <div class="status-hero">
@@ -189,7 +200,7 @@ export function renderControlPage(baseUrl) {
         <div class="toolbar-group"><select id="log-level" class="select" aria-label="Log level"><option value="all">All levels</option><option value="info">Info</option><option value="error">Errors</option></select><label class="check"><input id="log-auto" type="checkbox" checked>Auto refresh</label></div>
         <button id="log-refresh" class="button quiet" type="button">Refresh</button>
       </div>
-      <div id="log-panel" class="log-panel" aria-live="polite"><div class="log-empty">Loading logs</div></div>
+      <div id="log-panel" class="log-panel" tabindex="0" aria-live="polite"><div class="log-empty">Loading logs</div></div>
     </section>
 
     <section id="view-email" class="view" role="tabpanel" hidden>
@@ -238,8 +249,15 @@ export function renderControlPage(baseUrl) {
       </form>
     </section>
   </main>
+  </div>
+  <script src="/assets/vendor/perfect-scrollbar.min.js"></script>
   <script>
     const byId = (id) => document.getElementById(id);
+    const createScrollbar = (element, options) => window.PerfectScrollbar
+      ? new window.PerfectScrollbar(element, options)
+      : { update() {} };
+    const mainScrollbar = createScrollbar(byId('main-scroll'), { suppressScrollX:true, wheelPropagation:false });
+    const logScrollbar = createScrollbar(byId('log-panel'), { suppressScrollX:true, wheelPropagation:false });
     let activeView = 'overview';
     let selectedEmailType = 'result';
     let mailRecipients = [];
@@ -262,6 +280,8 @@ export function renderControlPage(baseUrl) {
       document.querySelectorAll('.tab').forEach((tab) => { const selected = tab.dataset.view === name; tab.classList.toggle('active', selected); tab.setAttribute('aria-selected', String(selected)); });
       if (name === 'logs') loadLogs();
       if (name === 'settings' && !settingsLoaded) loadSettings();
+      byId('main-scroll').scrollTop=0;
+      requestAnimationFrame(()=>mainScrollbar.update());
     }
 
     async function refreshOverview() {
@@ -296,6 +316,7 @@ export function renderControlPage(baseUrl) {
           byId('error-section').hidden = !data.latest.lastError;
           text('last-error', data.latest.lastError);
         }
+        mainScrollbar.update();
       } catch (error) {
         text('status', 'Unavailable'); text('header-status', 'Offline');
         byId('header-dot').className = 'dot error';
@@ -307,7 +328,7 @@ export function renderControlPage(baseUrl) {
       try {
         const data = await request('/api/logs?limit=200&level=' + encodeURIComponent(byId('log-level').value));
         panel.replaceChildren();
-        if (!data.logs.length) { const empty=document.createElement('div'); empty.className='log-empty'; empty.textContent='No matching logs'; panel.append(empty); return; }
+        if (!data.logs.length) { const empty=document.createElement('div'); empty.className='log-empty'; empty.textContent='No matching logs'; panel.append(empty); logScrollbar.update(); return; }
         data.logs.forEach((entry) => {
           const row=document.createElement('div'); row.className='log-row';
           const time=document.createElement('time'); time.className='log-time'; time.textContent=new Date(entry.timestamp).toLocaleString();
@@ -317,7 +338,7 @@ export function renderControlPage(baseUrl) {
           if (entry.fields && Object.keys(entry.fields).length) { const fields=document.createElement('pre'); fields.className='log-fields'; fields.textContent=JSON.stringify(entry.fields,null,2); row.append(fields); }
           panel.append(row);
         });
-        panel.scrollTop=panel.scrollHeight;
+        logScrollbar.update(); panel.scrollTop=panel.scrollHeight; logScrollbar.update();
       } catch (error) { panel.textContent=error.message; }
     }
 
@@ -329,6 +350,7 @@ export function renderControlPage(baseUrl) {
         setInput('rngdle-email',data.rngdleEmail); setInput('smtp-username',data.smtpUsername); setInput('smtp-from',data.smtpFrom); setInput('subject-prefix',data.mailSubjectPrefix); setInput('mail-to',data.mailTo);
         setInput('smtp-host',data.smtpHost); setInput('smtp-port',data.smtpPort); byId('smtp-secure').checked=data.smtpSecure; byId('smtp-require-tls').checked=data.smtpRequireTls; byId('smtp-password').value=''; text('secret-state',data.hasSmtpPassword ? '(configured)' : '(missing)');
         settingsLoaded=true;
+        mainScrollbar.update();
       } catch (error) { text('settings-message',error.message); byId('settings-message').className='feedback error'; }
     }
 
@@ -338,6 +360,7 @@ export function renderControlPage(baseUrl) {
     document.querySelectorAll('[data-email-type]').forEach((button)=>button.addEventListener('click',()=>{ selectedEmailType=button.dataset.emailType; document.querySelectorAll('[data-email-type]').forEach((item)=>item.classList.toggle('active',item===button)); const url='/preview/email?type='+encodeURIComponent(selectedEmailType)+'&t='+Date.now(); byId('email-frame').src=url; byId('preview-open').href=url; byId('email-message').textContent=''; }));
     byId('email-send').addEventListener('click',async()=>{ const recipients=mailRecipients.length ? mailRecipients.join(', ') : 'the configured recipients'; const label=selectedEmailType==='result' ? 'result' : 'login required'; if(!window.confirm('Send the '+label+' email to '+recipients+'?')) return; const button=byId('email-send'); const message=byId('email-message'); button.disabled=true; button.textContent='Sending'; message.className='feedback email-feedback'; message.textContent=''; try { const data=await request('/api/email/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:selectedEmailType})}); message.textContent=data.message; } catch(error) { message.className='feedback email-feedback error'; message.textContent=error.message; } finally { button.disabled=false; button.textContent='Send email'; } });
     byId('settings-form').addEventListener('submit',async(event)=>{ event.preventDefault(); const message=byId('settings-message'); const save=byId('settings-save'); message.className='feedback'; message.textContent=''; save.disabled=true; const payload={timezone:byId('timezone').value,scheduleTime:byId('schedule-time').value,retryMinutes:Number(byId('retry-minutes').value),pollSeconds:Number(byId('poll-seconds').value),browserTimeoutMs:Number(byId('browser-timeout').value),controlPublicUrl:byId('control-url').value,rngdleEmail:byId('rngdle-email').value,smtpUsername:byId('smtp-username').value,smtpFrom:byId('smtp-from').value,mailSubjectPrefix:byId('subject-prefix').value,mailTo:byId('mail-to').value,smtpHost:byId('smtp-host').value,smtpPort:Number(byId('smtp-port').value),smtpSecure:byId('smtp-secure').checked,smtpRequireTls:byId('smtp-require-tls').checked,smtpAppPassword:byId('smtp-password').value}; try { const data=await request('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); message.textContent=data.message; settingsLoaded=false; await loadSettings(); await refreshOverview(); } catch(error) { message.className='feedback error'; message.textContent=error.message; } finally { save.disabled=false; } });
+    window.addEventListener('resize',()=>{ mainScrollbar.update(); logScrollbar.update(); });
     setInterval(()=>{ refreshOverview(); if(activeView==='logs'&&byId('log-auto').checked) loadLogs(); },3000);
     refreshOverview();
   </script>

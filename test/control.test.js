@@ -70,12 +70,24 @@ test("control APIs expose operations without exposing secrets", async (context) 
   assert.match(page, /@font-face/);
   assert.match(page, /\/assets\/fonts\/inter-latin\.woff2/);
   assert.match(page, /id="email-send"/);
+  assert.match(page, /perfect-scrollbar\.min\.js/);
+  assert.match(page, /new window\.PerfectScrollbar\(element, options\)/);
+  assert.match(page, /: \{ update\(\) \{\} \}/);
+  assert.match(page, /\.log-panel \{ contain:paint;/);
+  assert.match(page, /\.main-scroll\.ps,\.log-panel\.ps \{ overflow:hidden !important; \}/);
   assert.match(page, /<header class="topbar">[\s\S]*<nav class="tabs"[\s\S]*<\/header>/);
   assert.doesNotMatch(page, /tabs-wrap/);
   const font = await fetch(`${baseUrl}/assets/fonts/space-mono-700-latin.woff2`);
   assert.equal(font.status, 200);
   assert.equal(font.headers.get("content-type"), "font/woff2");
   assert.ok((await font.arrayBuffer()).byteLength > 1_000);
+  const scrollbarScript = await fetch(`${baseUrl}/assets/vendor/perfect-scrollbar.min.js`);
+  assert.equal(scrollbarScript.status, 200);
+  assert.match(scrollbarScript.headers.get("content-type"), /text\/javascript/);
+  assert.ok((await scrollbarScript.arrayBuffer()).byteLength > 10_000);
+  const scrollbarStyles = await fetch(`${baseUrl}/assets/vendor/perfect-scrollbar.css`);
+  assert.equal(scrollbarStyles.status, 200);
+  assert.match(scrollbarStyles.headers.get("content-type"), /text\/css/);
 
   const overview = await (await fetch(`${baseUrl}/api/overview`)).json();
   assert.equal(overview.result.number, 123456);

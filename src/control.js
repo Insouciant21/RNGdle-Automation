@@ -13,18 +13,41 @@ import { readState } from "./state.js";
 
 const MAX_BODY_BYTES = 32 * 1024;
 const EMAIL_TYPES = new Set(["result", "authentication"]);
-const FONT_ASSETS = new Map([
+const STATIC_ASSETS = new Map([
   [
     "/assets/fonts/inter-latin.woff2",
-    new URL("../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2", import.meta.url),
+    {
+      url: new URL("../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2", import.meta.url),
+      contentType: "font/woff2",
+    },
   ],
   [
     "/assets/fonts/space-mono-400-latin.woff2",
-    new URL("../node_modules/@fontsource/space-mono/files/space-mono-latin-400-normal.woff2", import.meta.url),
+    {
+      url: new URL("../node_modules/@fontsource/space-mono/files/space-mono-latin-400-normal.woff2", import.meta.url),
+      contentType: "font/woff2",
+    },
   ],
   [
     "/assets/fonts/space-mono-700-latin.woff2",
-    new URL("../node_modules/@fontsource/space-mono/files/space-mono-latin-700-normal.woff2", import.meta.url),
+    {
+      url: new URL("../node_modules/@fontsource/space-mono/files/space-mono-latin-700-normal.woff2", import.meta.url),
+      contentType: "font/woff2",
+    },
+  ],
+  [
+    "/assets/vendor/perfect-scrollbar.css",
+    {
+      url: new URL("../node_modules/perfect-scrollbar/css/perfect-scrollbar.css", import.meta.url),
+      contentType: "text/css; charset=utf-8",
+    },
+  ],
+  [
+    "/assets/vendor/perfect-scrollbar.min.js",
+    {
+      url: new URL("../node_modules/perfect-scrollbar/dist/perfect-scrollbar.min.js", import.meta.url),
+      contentType: "text/javascript; charset=utf-8",
+    },
   ],
 ]);
 
@@ -66,10 +89,10 @@ function sendHtml(response, status, html, { preview = false } = {}) {
   response.end(html);
 }
 
-async function sendFont(request, response, assetUrl) {
-  const contents = await readFile(assetUrl);
+async function sendStaticAsset(request, response, asset) {
+  const contents = await readFile(asset.url);
   response.writeHead(200, {
-    "Content-Type": "font/woff2",
+    "Content-Type": asset.contentType,
     "Content-Length": contents.length,
     "Cache-Control": "public, max-age=31536000, immutable",
     "X-Content-Type-Options": "nosniff",
@@ -158,8 +181,8 @@ export async function createControlServer(
   const server = http.createServer(async (request, response) => {
     try {
       const url = new URL(request.url, "http://localhost");
-      if ((request.method === "GET" || request.method === "HEAD") && FONT_ASSETS.has(url.pathname)) {
-        await sendFont(request, response, FONT_ASSETS.get(url.pathname));
+      if ((request.method === "GET" || request.method === "HEAD") && STATIC_ASSETS.has(url.pathname)) {
+        await sendStaticAsset(request, response, STATIC_ASSETS.get(url.pathname));
       } else if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/") {
         response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
         response.end(request.method === "HEAD" ? undefined : page);

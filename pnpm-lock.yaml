@@ -17,6 +17,9 @@ importers:
       nodemailer:
         specifier: 9.0.3
         version: 9.0.3
+      perfect-scrollbar:
+        specifier: 1.5.6
+        version: 1.5.6
       playwright:
         specifier: 1.62.0
         version: 1.62.0
@@ -40,6 +43,9 @@ packages:
   nodemailer@9.0.3:
     resolution: {integrity: sha512-n+YP+NKwR5zRWa60k3GiQ6Q3B4KXCoAw40dAKeCtYn020iNN74aWK2liXIC3ZEATeGql7we3tE3t8QwhY0eskw==}
     engines: {node: '>=6.0.0'}
+
+  perfect-scrollbar@1.5.6:
+    resolution: {integrity: sha512-rixgxw3SxyJbCaSpo1n35A/fwI1r2rdwMKOTCg/AcG+xOEyZcE8UHVjpZMFCVImzsFoCZeJTT+M/rdEIQYO2nw==}
 
   playwright-core@1.62.0:
     resolution: {integrity: sha512-nsNRyq0r2zsG8AcRHWknc9QRA5XCueC7gWMrs+Gx2tlZn9hcl8zudfh00lhJPY1DE7NmZ6bDsT9g2yey8mXljA==}
@@ -66,6 +72,8 @@ snapshots:
     optional: true
 
   nodemailer@9.0.3: {}
+
+  perfect-scrollbar@1.5.6: {}
 
   playwright-core@1.62.0: {}
 

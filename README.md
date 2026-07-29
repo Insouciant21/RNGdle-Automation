@@ -162,6 +162,8 @@ Control 的 Settings 页面会将修改写入 `/app/data/settings.json`，其优
 
 Control 将品牌、四视图导航和 scheduler 状态集中在页面 header 中。移动端导航保留在 header 第二行，四个入口等宽排列。
 
+页面主区域与 Logs 面板使用本地打包的 `perfect-scrollbar`，内容刷新、视图切换和窗口缩放后会自动同步滚动范围；脚本不可用时回退到原生滚动。
+
 四个视图分别提供：
 
 | 视图 | 功能 |
