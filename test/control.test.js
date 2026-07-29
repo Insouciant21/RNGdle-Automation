@@ -74,7 +74,9 @@ test("control APIs expose operations without exposing secrets", async (context) 
   assert.match(page, /new window\.PerfectScrollbar\(element, options\)/);
   assert.match(page, /: \{ update\(\) \{\} \}/);
   assert.match(page, /\.log-panel \{ contain:paint;/);
-  assert.match(page, /\.main-scroll\.ps,\.log-panel\.ps \{ overflow:hidden !important; \}/);
+  assert.match(page, /id="preview-scroll" class="preview-scroll"/);
+  assert.match(page, /const emailScrollbar = createScrollbar\(byId\('preview-scroll'\)/);
+  assert.match(page, /\.main-scroll\.ps,\.log-panel\.ps,\.preview-scroll\.ps \{ overflow:hidden !important; \}/);
   assert.match(page, /<header class="topbar">[\s\S]*<nav class="tabs"[\s\S]*<\/header>/);
   assert.doesNotMatch(page, /tabs-wrap/);
   const font = await fetch(`${baseUrl}/assets/fonts/space-mono-700-latin.woff2`);

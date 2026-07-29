@@ -105,7 +105,8 @@ export function renderControlPage(baseUrl) {
     .email-heading { align-items:flex-end; }
     .email-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; }
     .email-feedback { margin:0 0 10px; text-align:right; }
-    .preview-frame { display:block; width:100%; height:820px; border:1px solid var(--outline); border-radius:8px; background:#fafafa; }
+    .preview-scroll { contain:paint; position:relative; height:820px; border:1px solid var(--outline); border-radius:8px; background:#fafafa; overflow:auto; }
+    .preview-frame { display:block; width:100%; min-height:100%; height:100%; border:0; background:#fafafa; }
     .settings-form { border-top:1px solid var(--outline); }
     .settings-group { display:grid; grid-template-columns:190px minmax(0,1fr); gap:28px; padding:24px 0; border-bottom:1px solid var(--outline); }
     .settings-heading h2 { margin:0; font-size:15px; line-height:1.35; text-transform:uppercase; }
@@ -116,7 +117,7 @@ export function renderControlPage(baseUrl) {
     .form-field .field-label { margin:0 0 6px; }
     .settings-actions { display:flex; align-items:center; justify-content:flex-end; gap:14px; padding-top:20px; }
     .secret-state { color:var(--success); }
-    .main-scroll.ps,.log-panel.ps { overflow:hidden !important; }
+    .main-scroll.ps,.log-panel.ps,.preview-scroll.ps { overflow:hidden !important; }
     .ps--active-y > .ps__rail-y { width:10px; opacity:.5; background:transparent; z-index:20; }
     .ps--active-x > .ps__rail-x { height:10px; opacity:.5; background:transparent; z-index:20; }
     .ps .ps__rail-y:hover,.ps .ps__rail-y:focus,.ps .ps__rail-y.ps--clicking,.ps .ps__rail-x:hover,.ps .ps__rail-x:focus,.ps .ps__rail-x.ps--clicking { opacity:1; background:var(--raised); }
@@ -124,8 +125,8 @@ export function renderControlPage(baseUrl) {
     .ps__thumb-x { bottom:2px; height:5px; border-radius:4px; background:var(--strong); }
     .ps__rail-y:hover > .ps__thumb-y,.ps__rail-y:focus > .ps__thumb-y,.ps__rail-y.ps--clicking .ps__thumb-y { width:5px; background:var(--prose-2); }
     .ps__rail-x:hover > .ps__thumb-x,.ps__rail-x:focus > .ps__thumb-x,.ps__rail-x.ps--clicking .ps__thumb-x { height:5px; background:var(--prose-2); }
-    @media (max-width:760px) { .topbar { grid-template-columns:minmax(0,1fr) auto; gap:0; padding:0; } .brand { grid-column:1; grid-row:1; min-height:49px; padding:7px 12px; } .header-state { grid-column:2; grid-row:1; min-height:49px; padding:7px 12px; } .tabs { grid-column:1/-1; grid-row:2; width:100%; border-top:1px solid var(--outline); overflow-x:auto; } .tab { flex:1 0 78px; min-width:78px; min-height:43px; padding:10px 8px; } main { padding:28px 16px 44px; } .overview-grid { grid-template-columns:1fr; } .settings-group { grid-template-columns:1fr; gap:14px; } .log-row { grid-template-columns:1fr auto; gap:4px 10px; } .log-message,.log-fields { grid-column:1/-1; } .log-panel { height:460px; } .email-heading { align-items:stretch; flex-direction:column; } .email-actions { justify-content:flex-start; } .email-feedback { text-align:left; } .preview-frame { height:720px; } }
-    @media (max-width:520px) { .brand-context { display:none; } .header-state { max-width:100%; } main { padding:24px 12px 36px; } .status-hero { padding-top:4px; } .status-frame { min-height:82px; } .status-copy { font-size:21px; } .stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .stat:nth-child(3) { border-left:0; } .stat:nth-child(n+3) { border-top:1px solid var(--outline); } .form-grid { grid-template-columns:1fr; } .form-field.full { grid-column:auto; } .settings-actions { align-items:stretch; flex-direction:column; } .settings-actions .button { width:100%; } .toolbar { align-items:stretch; flex-direction:column; } .toolbar-group { justify-content:space-between; } .email-actions .segmented { width:100%; } .email-actions .segment { flex:1; } .email-actions .button { flex:1; } .preview-frame { height:660px; } }
+    @media (max-width:760px) { .topbar { grid-template-columns:minmax(0,1fr) auto; gap:0; padding:0; } .brand { grid-column:1; grid-row:1; min-height:49px; padding:7px 12px; } .header-state { grid-column:2; grid-row:1; min-height:49px; padding:7px 12px; } .tabs { grid-column:1/-1; grid-row:2; width:100%; border-top:1px solid var(--outline); overflow-x:auto; } .tab { flex:1 0 78px; min-width:78px; min-height:43px; padding:10px 8px; } main { padding:28px 16px 44px; } .overview-grid { grid-template-columns:1fr; } .settings-group { grid-template-columns:1fr; gap:14px; } .log-row { grid-template-columns:1fr auto; gap:4px 10px; } .log-message,.log-fields { grid-column:1/-1; } .log-panel { height:460px; } .email-heading { align-items:stretch; flex-direction:column; } .email-actions { justify-content:flex-start; } .email-feedback { text-align:left; } .preview-scroll { height:720px; } }
+    @media (max-width:520px) { .brand-context { display:none; } .header-state { max-width:100%; } main { padding:24px 12px 36px; } .status-hero { padding-top:4px; } .status-frame { min-height:82px; } .status-copy { font-size:21px; } .stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .stat:nth-child(3) { border-left:0; } .stat:nth-child(n+3) { border-top:1px solid var(--outline); } .form-grid { grid-template-columns:1fr; } .form-field.full { grid-column:auto; } .settings-actions { align-items:stretch; flex-direction:column; } .settings-actions .button { width:100%; } .toolbar { align-items:stretch; flex-direction:column; } .toolbar-group { justify-content:space-between; } .email-actions .segmented { width:100%; } .email-actions .segment { flex:1; } .email-actions .button { flex:1; } .preview-scroll { height:660px; } }
   </style>
 </head>
 <body>
@@ -209,7 +210,9 @@ export function renderControlPage(baseUrl) {
         <div class="email-actions"><div class="segmented" role="group" aria-label="Email type"><button class="segment active" type="button" data-email-type="result">Result</button><button class="segment" type="button" data-email-type="authentication">Login required</button></div><button id="email-send" class="button" type="button">Send email</button><a id="preview-open" class="button quiet" href="/preview/email?type=result" target="_blank">Open</a></div>
       </div>
       <div id="email-message" class="feedback email-feedback" role="status"></div>
-      <iframe id="email-frame" class="preview-frame" title="Email preview" src="/preview/email?type=result"></iframe>
+      <div id="preview-scroll" class="preview-scroll" tabindex="0" role="region" aria-label="Email preview">
+        <iframe id="email-frame" class="preview-frame" title="Email preview" src="/preview/email?type=result" scrolling="no"></iframe>
+      </div>
     </section>
 
     <section id="view-settings" class="view" role="tabpanel" hidden>
@@ -258,10 +261,12 @@ export function renderControlPage(baseUrl) {
       : { update() {} };
     const mainScrollbar = createScrollbar(byId('main-scroll'), { suppressScrollX:true, wheelPropagation:false });
     const logScrollbar = createScrollbar(byId('log-panel'), { suppressScrollX:true, wheelPropagation:false });
+    const emailScrollbar = createScrollbar(byId('preview-scroll'), { suppressScrollX:true, wheelPropagation:false });
     let activeView = 'overview';
     let selectedEmailType = 'result';
     let mailRecipients = [];
     let settingsLoaded = false;
+    let emailPreviewDocument;
 
     async function request(url, options) {
       const response = await fetch(url, { cache:'no-store', ...options });
@@ -279,6 +284,7 @@ export function renderControlPage(baseUrl) {
       document.querySelectorAll('.view').forEach((view) => { view.hidden = view.id !== 'view-' + name; });
       document.querySelectorAll('.tab').forEach((tab) => { const selected = tab.dataset.view === name; tab.classList.toggle('active', selected); tab.setAttribute('aria-selected', String(selected)); });
       if (name === 'logs') loadLogs();
+      if (name === 'email') requestAnimationFrame(prepareEmailPreview);
       if (name === 'settings' && !settingsLoaded) loadSettings();
       byId('main-scroll').scrollTop=0;
       requestAnimationFrame(()=>mainScrollbar.update());
@@ -342,6 +348,33 @@ export function renderControlPage(baseUrl) {
       } catch (error) { panel.textContent=error.message; }
     }
 
+    function scrollEmailPreview(delta) {
+      const panel=byId('preview-scroll'); const before=panel.scrollTop;
+      panel.scrollTop=Math.max(0,Math.min(panel.scrollHeight-panel.clientHeight,panel.scrollTop+delta));
+      return panel.scrollTop!==before;
+    }
+
+    function prepareEmailPreview() {
+      const panel=byId('preview-scroll'); const frame=byId('email-frame');
+      let previewDocument;
+      try { previewDocument=frame.contentDocument; } catch { emailScrollbar.update(); return; }
+      if (!previewDocument?.documentElement || !panel.clientHeight) { emailScrollbar.update(); return; }
+      if (previewDocument!==emailPreviewDocument) {
+        emailPreviewDocument=previewDocument;
+        previewDocument.addEventListener('wheel',(event)=>{ if(scrollEmailPreview(event.deltaY)) event.preventDefault(); },{passive:false});
+        previewDocument.addEventListener('keydown',(event)=>{ let delta=0; if(event.key==='ArrowDown') delta=40; else if(event.key==='ArrowUp') delta=-40; else if(event.key==='PageDown'||event.key===' ') delta=panel.clientHeight*.85*(event.shiftKey?-1:1); else if(event.key==='PageUp') delta=-panel.clientHeight*.85; else if(event.key==='Home') delta=-panel.scrollHeight; else if(event.key==='End') delta=panel.scrollHeight; if(delta&&scrollEmailPreview(delta)) event.preventDefault(); });
+        let touchY=null;
+        previewDocument.addEventListener('touchstart',(event)=>{ touchY=event.touches.length===1?event.touches[0].clientY:null; },{passive:true});
+        previewDocument.addEventListener('touchmove',(event)=>{ if(touchY===null||event.touches.length!==1) return; const nextY=event.touches[0].clientY; if(scrollEmailPreview(touchY-nextY)) event.preventDefault(); touchY=nextY; },{passive:false});
+      }
+      frame.style.height=panel.clientHeight+'px';
+      previewDocument.documentElement.style.setProperty('overflow','hidden','important');
+      if (previewDocument.body) previewDocument.body.style.setProperty('overflow','hidden','important');
+      const contentHeight=Math.max(previewDocument.documentElement.scrollHeight,previewDocument.body?.scrollHeight??0);
+      frame.style.height=Math.max(panel.clientHeight,contentHeight)+'px';
+      emailScrollbar.update();
+    }
+
     function setInput(id, value) { byId(id).value = value ?? ''; }
     async function loadSettings() {
       try {
@@ -357,10 +390,11 @@ export function renderControlPage(baseUrl) {
     document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click',()=>showView(tab.dataset.view)));
     byId('auth-form').addEventListener('submit',async(event)=>{ event.preventDefault(); const message=byId('auth-message'); message.className='feedback'; message.textContent=''; byId('auth-submit').disabled=true; try { const data=await request('/api/auth-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({link:byId('auth-link').value})}); message.textContent=data.message; byId('auth-link').value=''; } catch(error) { message.className='feedback error'; message.textContent=error.message; } await refreshOverview(); });
     byId('log-refresh').addEventListener('click',loadLogs); byId('log-level').addEventListener('change',loadLogs);
-    document.querySelectorAll('[data-email-type]').forEach((button)=>button.addEventListener('click',()=>{ selectedEmailType=button.dataset.emailType; document.querySelectorAll('[data-email-type]').forEach((item)=>item.classList.toggle('active',item===button)); const url='/preview/email?type='+encodeURIComponent(selectedEmailType)+'&t='+Date.now(); byId('email-frame').src=url; byId('preview-open').href=url; byId('email-message').textContent=''; }));
+    byId('email-frame').addEventListener('load',()=>requestAnimationFrame(prepareEmailPreview));
+    document.querySelectorAll('[data-email-type]').forEach((button)=>button.addEventListener('click',()=>{ selectedEmailType=button.dataset.emailType; document.querySelectorAll('[data-email-type]').forEach((item)=>item.classList.toggle('active',item===button)); const url='/preview/email?type='+encodeURIComponent(selectedEmailType)+'&t='+Date.now(); byId('preview-scroll').scrollTop=0; byId('email-frame').src=url; byId('preview-open').href=url; byId('email-message').textContent=''; }));
     byId('email-send').addEventListener('click',async()=>{ const recipients=mailRecipients.length ? mailRecipients.join(', ') : 'the configured recipients'; const label=selectedEmailType==='result' ? 'result' : 'login required'; if(!window.confirm('Send the '+label+' email to '+recipients+'?')) return; const button=byId('email-send'); const message=byId('email-message'); button.disabled=true; button.textContent='Sending'; message.className='feedback email-feedback'; message.textContent=''; try { const data=await request('/api/email/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:selectedEmailType})}); message.textContent=data.message; } catch(error) { message.className='feedback email-feedback error'; message.textContent=error.message; } finally { button.disabled=false; button.textContent='Send email'; } });
     byId('settings-form').addEventListener('submit',async(event)=>{ event.preventDefault(); const message=byId('settings-message'); const save=byId('settings-save'); message.className='feedback'; message.textContent=''; save.disabled=true; const payload={timezone:byId('timezone').value,scheduleTime:byId('schedule-time').value,retryMinutes:Number(byId('retry-minutes').value),pollSeconds:Number(byId('poll-seconds').value),browserTimeoutMs:Number(byId('browser-timeout').value),controlPublicUrl:byId('control-url').value,rngdleEmail:byId('rngdle-email').value,smtpUsername:byId('smtp-username').value,smtpFrom:byId('smtp-from').value,mailSubjectPrefix:byId('subject-prefix').value,mailTo:byId('mail-to').value,smtpHost:byId('smtp-host').value,smtpPort:Number(byId('smtp-port').value),smtpSecure:byId('smtp-secure').checked,smtpRequireTls:byId('smtp-require-tls').checked,smtpAppPassword:byId('smtp-password').value}; try { const data=await request('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); message.textContent=data.message; settingsLoaded=false; await loadSettings(); await refreshOverview(); } catch(error) { message.className='feedback error'; message.textContent=error.message; } finally { save.disabled=false; } });
-    window.addEventListener('resize',()=>{ mainScrollbar.update(); logScrollbar.update(); });
+    window.addEventListener('resize',()=>{ mainScrollbar.update(); logScrollbar.update(); prepareEmailPreview(); });
     setInterval(()=>{ refreshOverview(); if(activeView==='logs'&&byId('log-auto').checked) loadLogs(); },3000);
     refreshOverview();
   </script>
