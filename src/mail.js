@@ -33,6 +33,10 @@ function transport(config) {
   });
 }
 
+function fromAddress(config) {
+  return { name: config.mail.fromName ?? "RNGdle Today", address: config.smtp.from };
+}
+
 function emailShell({ preheader, headerMeta, content }) {
   return `<!doctype html>
 <html lang="en">
@@ -102,7 +106,7 @@ export function buildRollMessage(config, date, result) {
     </table>`;
 
   return {
-    from: config.smtp.from,
+    from: fromAddress(config),
     to: config.smtp.to,
     subject: `${config.mail.subjectPrefix} ${date}: ${result.number} (+${result.earnedEp} EP)`,
     text: [
@@ -136,7 +140,7 @@ export function buildAuthenticationRequiredMessage(config) {
     </table>`;
 
   return {
-    from: config.smtp.from,
+    from: fromAddress(config),
     to: config.smtp.to,
     subject: `${config.mail.subjectPrefix} Login required`,
     text: `The saved RNGdle login has expired. Open ${config.control.publicUrl} and complete the email magic-link login. The pending daily run will continue automatically.`,

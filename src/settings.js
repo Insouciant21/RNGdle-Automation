@@ -80,6 +80,7 @@ export function publicSettings(config) {
     smtpUsername: config.smtp.username,
     smtpFrom: config.smtp.from,
     mailTo: config.smtp.to.join(", "),
+    mailFromName: config.mail.fromName ?? "RNGdle Today",
     mailSubjectPrefix: config.mail.subjectPrefix,
     hasSmtpPassword: Boolean(config.smtp.password),
   };
@@ -113,6 +114,9 @@ export function validateSettings(input, config) {
     smtpUsername: emailValue(input.smtpUsername ?? config.smtp.username, "smtpUsername"),
     smtpFrom: emailValue(input.smtpFrom || input.smtpUsername || config.smtp.from, "smtpFrom"),
     mailTo: recipientValues(input.mailTo ?? config.smtp.to),
+    mailFromName: stringValue(input.mailFromName ?? config.mail.fromName ?? "RNGdle Today", "mailFromName", {
+      max: 100,
+    }),
     mailSubjectPrefix: stringValue(input.mailSubjectPrefix ?? config.mail.subjectPrefix, "mailSubjectPrefix", {
       max: 100,
     }),
@@ -136,6 +140,7 @@ export function applySettings(config, settings) {
   config.smtp.from = settings.smtpFrom;
   config.smtp.to = [...settings.mailTo];
   config.smtp.password = settings.smtpAppPassword;
+  config.mail.fromName = settings.mailFromName;
   config.mail.subjectPrefix = settings.mailSubjectPrefix;
 }
 

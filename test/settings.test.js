@@ -22,7 +22,7 @@ function configFor(directory) {
       to: ["receiver@example.com"],
       password: "original-secret",
     },
-    mail: { subjectPrefix: "[RNGdle]" },
+    mail: { fromName: "RNGdle Today", subjectPrefix: "[RNGdle]" },
     storage: { settingsPath: path.join(directory, "settings.json") },
   };
 }
@@ -36,6 +36,7 @@ test("runtime settings persist, hot-apply, and never expose the password", async
     ...publicSettings(config),
     scheduleTime: "09:15",
     retryMinutes: 45,
+    mailFromName: "RNGdle Today",
     mailTo: "first@example.com, second@example.com",
     smtpAppPassword: "replacement-secret",
   });
@@ -43,6 +44,7 @@ test("runtime settings persist, hot-apply, and never expose the password", async
   assert.equal(config.schedule.time, "09:15");
   assert.equal(config.smtp.password, "replacement-secret");
   assert.deepEqual(config.smtp.to, ["first@example.com", "second@example.com"]);
+  assert.equal(config.mail.fromName, "RNGdle Today");
   assert.equal(visible.hasSmtpPassword, true);
   assert.equal("smtpAppPassword" in visible, false);
   assert.equal((await fs.stat(config.storage.settingsPath)).mode & 0o777, 0o600);

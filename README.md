@@ -145,6 +145,7 @@ Docker Compose 从 `.env` 注入启动配置，[config/config.example.yaml](conf
 | `SMTP_USER` | 必填 | 完整 Gmail 发件地址 |
 | `SMTP_APP_PASSWORD` | 必填 | Google 应用专用密码 |
 | `MAIL_FROM` | `SMTP_USER` | 邮件 From；留空时使用 SMTP 用户 |
+| `MAIL_FROM_NAME` | `RNGdle Today` | 收件箱中显示的发件人昵称 |
 | `MAIL_TO` | 必填 | 一个或多个收件人，逗号分隔 |
 | `MAIL_SUBJECT_PREFIX` | `[RNGdle]` | 邮件标题前缀 |
 | `CONTROL_PORT` | `3000` | 容器内 Control 端口 |

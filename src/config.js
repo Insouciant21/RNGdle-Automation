@@ -139,6 +139,7 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
       to: recipients.map((recipient, index) => requiredString(recipient, `smtp.to[${index}]`)),
     },
     mail: {
+      fromName: requiredString(raw.mail?.fromName ?? "RNGdle Today", "mail.fromName"),
       subjectPrefix: requiredString(raw.mail?.subjectPrefix ?? "[RNGdle]", "mail.subjectPrefix"),
     },
     storage: {

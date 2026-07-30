@@ -49,7 +49,7 @@ test("control APIs expose operations without exposing secrets", async (context) 
       from: "sender@gmail.com",
       to: ["receiver@example.com"],
     },
-    mail: { subjectPrefix: "[RNGdle]" },
+    mail: { fromName: "RNGdle Today", subjectPrefix: "[RNGdle]" },
     storage: { statePath, settingsPath: path.join(directory, "settings.json") },
   };
   const sent = [];
@@ -97,6 +97,7 @@ test("control APIs expose operations without exposing secrets", async (context) 
 
   const settings = await (await fetch(`${baseUrl}/api/settings`)).json();
   assert.equal(settings.hasSmtpPassword, true);
+  assert.equal(settings.mailFromName, "RNGdle Today");
   assert.equal("smtpAppPassword" in settings, false);
   assert.doesNotMatch(JSON.stringify(settings), /never-return-this/);
 

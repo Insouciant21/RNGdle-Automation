@@ -18,6 +18,7 @@ test("loads YAML and expands secret environment variables", async (context) => {
   assert.equal(config.smtp.authMode, "password");
   assert.equal(config.schedule.time, "08:02");
   assert.equal(config.control.port, 3000);
+  assert.equal(config.mail.fromName, "RNGdle Today");
 });
 
 test("loads Gmail SMTP settings from environment variables", async (context) => {
@@ -38,6 +39,7 @@ test("loads Gmail SMTP settings from environment variables", async (context) => 
   assert.equal(config.smtp.authMode, "password");
   assert.equal(config.smtp.password, "app-password");
   assert.equal(config.smtp.from, "sender@gmail.com");
+  assert.equal(config.mail.fromName, "RNGdle Today");
   assert.deepEqual(config.smtp.to, ["receiver@example.com"]);
 });
 

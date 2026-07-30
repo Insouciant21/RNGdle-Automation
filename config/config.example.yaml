@@ -36,6 +36,7 @@ smtp:
   to: "${MAIL_TO}"
 
 mail:
+  fromName: "${MAIL_FROM_NAME:-RNGdle Today}"
   subjectPrefix: "${MAIL_SUBJECT_PREFIX:-[RNGdle]}"
 
 storage:
