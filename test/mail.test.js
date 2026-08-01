@@ -14,6 +14,7 @@ test("buildRollMessage renders the RNGdle result hierarchy", () => {
     number: 534461,
     earnedEp: 2795,
     totalEp: 865460,
+    rarity: "mythic",
     badges: [{ emoji: "x", label: "Mini Scramble", score: 579 }],
   });
 
@@ -25,6 +26,8 @@ test("buildRollMessage renders the RNGdle result hierarchy", () => {
   assert.match(message.html, /865,460 EP/);
   assert.match(message.html, /BADGE BREAKDOWN/i);
   assert.match(message.html, /Mini Scramble/);
+  assert.match(message.html, /MYTHIC/i);
+  assert.match(message.html, /COMMON/i);
   assert.match(message.html, /1 BADGE EARNED/);
 });
 

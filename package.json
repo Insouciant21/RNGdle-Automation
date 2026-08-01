@@ -6,9 +6,8 @@
   "packageManager": "pnpm@11.17.0",
   "description": "Self-hosted RNGdle automation with persistent login, retry-safe scheduling, SMTP reports, and a local control dashboard.",
   "scripts": {
-    "auth": "node src/index.js auth",
     "once": "node src/index.js once",
-    "start": "node src/index.js scheduler",
+    "start": "node src/index.js rngdle",
     "test": "node --test"
   },
   "engines": {

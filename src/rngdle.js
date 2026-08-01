@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { errorSummary, log } from "./logger.js";
+import { badgeRarity, cardRarity, normalizeRarity } from "./rarity.js";
 
 export class AuthenticationRequiredError extends Error {
   constructor(message = "RNGdle authentication is required") {
@@ -13,8 +14,11 @@ function normalizeBadge(badge) {
     id: String(badge.id ?? "UNKNOWN"),
     label: String(badge.label ?? badge.id ?? "Unknown badge"),
     emoji: typeof badge.emoji === "string" ? badge.emoji : "",
+    description: typeof badge.description === "string" ? badge.description : "",
     score: Number.isFinite(Number(badge.score)) ? Number(badge.score) : 0,
     isScoring: badge.isScoring !== false,
+    isNew: badge.isNew === true,
+    rarity: normalizeRarity(badge.rarity) === "unknown" ? badgeRarity(badge.score) : normalizeRarity(badge.rarity),
   };
 }
 
@@ -34,6 +38,7 @@ export function normalizeHomePayload(payload) {
       earnedEp: Number(roll.totalScore),
       badges: Array.isArray(roll.badges) ? roll.badges.map(normalizeBadge) : [],
       poem: typeof roll.poem === "string" ? roll.poem : null,
+      rarity: normalizeRarity(roll.rarity) === "unknown" ? cardRarity(roll.totalScore) : normalizeRarity(roll.rarity),
     };
   }
   return {
@@ -126,6 +131,15 @@ export async function waitForInteractiveAuthentication(config, control = null) {
   const removeLinkListener = control?.onLink(onLine);
   try {
     await page.goto(config.rngdle.baseUrl, { waitUntil: "domcontentloaded" });
+    try {
+      await fetchHome(context, config);
+      log("info", "Existing RNGdle authentication is valid");
+      control?.setStatus("authenticated", "Authenticated");
+      return;
+    } catch (error) {
+      if (!(error instanceof AuthenticationRequiredError)) throw error;
+    }
+
     log("info", "Interactive authentication is waiting", {
       email: config.rngdle.email,
       control: config.control.publicUrl,

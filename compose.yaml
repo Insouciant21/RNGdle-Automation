@@ -1,5 +1,5 @@
 services:
-  scheduler:
+  rngdle:
     build: .
     restart: unless-stopped
     env_file: [.env]
@@ -14,19 +14,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
-
-  auth:
-    build: .
-    profiles: [tools]
-    stdin_open: true
-    tty: true
-    command: ["node", "src/index.js", "auth"]
-    env_file: [.env]
-    volumes:
-      - ./config/config.yaml:/app/config/config.yaml:ro
-      - rngdle-data:/app/data
-    ports:
-      - "127.0.0.1:3000:3000"
 
   once:
     build: .

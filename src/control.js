@@ -10,6 +10,7 @@ import {
 } from "./mail.js";
 import { publicSettings, saveRuntimeSettings } from "./settings.js";
 import { readState } from "./state.js";
+import { cardRarity } from "./rarity.js";
 
 const MAX_BODY_BYTES = 32 * 1024;
 const EMAIL_TYPES = new Set(["result", "authentication"]);
@@ -147,7 +148,9 @@ async function overviewPayload(config, status) {
           number: latestResult.day.result.number,
           earnedEp: latestResult.day.result.earnedEp,
           totalEp: latestResult.day.result.totalEp,
-          badges: latestResult.day.result.badges.length,
+          rarity: latestResult.day.result.rarity ?? cardRarity(latestResult.day.result.earnedEp),
+          badges: latestResult.day.result.badges,
+          poem: latestResult.day.result.poem ?? null,
         }
       : null,
   };
@@ -173,7 +176,7 @@ export async function createControlServer(
   config,
   { sendRoll = sendRollEmail, sendAuthentication = sendAuthenticationRequiredEmail } = {},
 ) {
-  let status = { state: "idle", label: "Scheduler ready" };
+  let status = { state: "idle", label: "RNGdle service ready" };
   let emailSendInFlight = false;
   const linkListeners = new Set();
   const page = renderControlPage(config.rngdle.baseUrl);

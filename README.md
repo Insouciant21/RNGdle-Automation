@@ -13,11 +13,11 @@
 | 能力 | 实现 |
 | --- | --- |
 | 自动调度 | 默认每天 `08:02 Asia/Shanghai` 执行，失败后每 30 分钟重试 |
-| 持久登录 | Playwright persistent context 保存 cookies；失效后进入交互认证 |
+| 持久登录 | RNGdle 服务启动时检查 Playwright persistent context；失效后通过 Control 页面交互认证 |
 | 幂等执行 | 已有 roll 直接复用；邮件失败只重试投递，不会再次生成数字 |
 | 邮件报告 | SMTP 同时发送 RNGdle 风格 HTML 与纯文本结果 |
 | Control | 提供状态、结构化日志、邮件预览、认证入口和运行时设置 |
-| 容器部署 | Compose 管理 scheduler、数据卷和健康检查，无需 VNC |
+| 容器部署 | Compose 管理 rngdle 服务、数据卷和健康检查，无需 VNC |
 
 Control 自托管 Inter 与 Space Mono 字体。运行状态保存在 `state.json`，默认只保留最近 45 天；网页修改的配置会立即生效并持久化到数据卷。
 
@@ -25,6 +25,9 @@ Control 自托管 Inter 与 Space Mono 字体。运行状态保存在 `state.jso
 
 ```text
 08:02 UTC+8
+    |
+    v
+启动 RNGdle 服务 ---- 会话失效 ----> Control 页面等待认证
     |
     v
 读取 state.json ---- 今日已成功 ----> 跳过
@@ -48,8 +51,7 @@ RNGdle 当前使用 email magic link 和 Cloudflare Turnstile，而不是数字�
 
 | 模式 | 用途 | 启动方式 |
 | --- | --- | --- |
-| `scheduler` | 常驻调度和自动重试 | `docker compose up -d scheduler` |
-| `auth` | 首次登录或手动更新会话 | `docker compose --profile tools run --rm --service-ports auth` |
+| `rngdle` | 常驻调度、认证和自动重试 | `docker compose up -d rngdle` |
 | `once` | 立即检查一次，仍遵守每日幂等状态 | `docker compose --profile tools run --rm --service-ports once` |
 
 ## 环境要求
@@ -95,10 +97,11 @@ MAIL_TO=receiver@example.com
 2. 按服务商要求填写 SMTP 用户名和密码、应用密码或令牌。
 3. 如果使用 OAuth2，同时填写 `SMTP_OAUTH_*` 配置，并提供服务商的 token endpoint。
 
-### 3. 首次认证 RNGdle
+### 3. 启动 RNGdle 服务并完成首次认证
 
 ```bash
-docker compose --profile tools run --rm --service-ports auth
+docker compose up -d rngdle
+docker compose ps rngdle
 ```
 
 打开 [http://localhost:3000](http://localhost:3000)：
@@ -107,19 +110,17 @@ docker compose --profile tools run --rm --service-ports auth
 2. 输入 `RNGDLE_EMAIL`，完成 Turnstile 并请求登录邮件。
 3. 不要在普通浏览器中消费 magic link；复制完整的 `https://...rngdle.com/...` 地址。
 4. 将地址粘贴到 Control 页面并提交。
-5. 页面显示 `Authenticated` 后，认证容器自动退出。
+5. 页面显示 `Authenticated` 后，RNGdle 服务会继续运行并等待每日任务。
 
 magic link 只允许 HTTPS 的 `rngdle.com` 域名。浏览器 profile 保存在 Docker volume，后续启动会直接复用。
 
 > [!NOTE]
 > RNGdle 强制使用绑定官网域名的 Cloudflare Turnstile。Control 无法直接请求登录邮件，因此 `REQUEST SIGN-IN LINK` 必须打开官网完成验证；这一步不能由容器安全绕过。
 
-### 4. 启动调度器
+RNGdle 服务后续会在每天 `08:02 Asia/Shanghai` 自动执行；日志可通过以下命令查看：
 
 ```bash
-docker compose up -d scheduler
-docker compose ps scheduler
-docker compose logs -f scheduler
+docker compose logs -f rngdle
 ```
 
 Control 页面位于 [http://localhost:3000](http://localhost:3000)。健康状态应为 `healthy`。
@@ -161,22 +162,22 @@ Control 的 Settings 页面会将修改写入 `/app/data/settings.json`，其优
 
 ## Control 页面
 
-Control 将品牌、四视图导航和 scheduler 状态集中在页面 header 中。移动端导航保留在 header 第二行，四个入口等宽排列。
+Control 将品牌、四视图导航和 RNGdle 服务状态集中在页面 header 中。移动端导航保留在 header 第二行，四个入口等宽排列。
 
-页面主区域、Logs 面板与 Email Preview 使用本地打包的 `perfect-scrollbar`，内容刷新、视图切换和窗口缩放后会自动同步滚动范围；脚本不可用时回退到原生滚动。
+页面主区域和 Logs 面板使用本地打包的 `perfect-scrollbar`，内容刷新、视图切换和窗口缩放后会自动同步滚动范围；脚本不可用时回退到原生滚动。Overview 右侧的 `Open preview` 会在新窗口打开 600px 邮件内容，和实际 SMTP 投递使用完全相同的 `buildRollMessage()` HTML。
 
 四个视图分别提供：
 
 | 视图 | 功能 |
 | --- | --- |
-| `Overview` | Scheduler 状态、最近 roll、EP、badges、邮件状态、重试信息和 RNGdle 认证 |
+| `Overview` | RNGdle 服务状态、rarity 数字框、badge breakdown、EP、邮件状态、重试信息和 RNGdle 认证 |
 | `Logs` | 当前进程最近 250 条结构化日志、级别筛选、手动与自动刷新 |
-| `Email` | 预览并手动发送最近结果邮件或登录失效邮件 |
+| `Authentication` | 请求 magic link 并提交 URL，管理持久化 RNGdle 会话 |
 | `Settings` | 热更新调度、浏览器超时、账号、收件人、主题和 SMTP 参数 |
 
-![RNGdle Control email](docs/control-email.png)
-
 ![RNGdle Control logs](docs/control-logs.png)
+
+![RNGdle Control authentication](docs/control-auth.png)
 
 ![RNGdle Control settings](docs/control-settings.png)
 
@@ -184,23 +185,23 @@ Control 将品牌、四视图导航和 scheduler 状态集中在页面 header �
 
 | 状态 | 含义 |
 | --- | --- |
-| `idle` | Scheduler 正常运行，没有等待人工操作 |
+| `idle` | RNGdle 服务正常运行，没有等待人工操作 |
 | `waiting` | RNGdle 登录失效，等待提交 magic link |
 | `authenticated` | 新会话已确认，待执行任务将继续 |
 
 Settings 中的 SMTP password 输入始终为空，只显示 `(configured)` 或 `(missing)`。留空保存会保留现有密码；输入新值才会替换。设置文件使用 `0600` 权限原子写入。
 
-Logs 只保留当前 scheduler 进程最近 250 条记录，容器重启后清空；需要长期历史时使用 `docker compose logs` 或配置 Docker 日志驱动。Email 视图发送前会确认当前模板和收件人；手动发送会写入日志，但不会改变每日任务状态。
+Logs 只保留当前 rngdle 进程最近 250 条记录，容器重启后清空；需要长期历史时使用 `docker compose logs` 或配置 Docker 日志驱动。Overview 右侧的邮件操作会在发送前确认收件人；手动发送会写入日志，但不会改变每日任务状态。
 
 Control 页面使用的本地 API：
 
 | 方法与路径 | 用途 |
 | --- | --- |
-| `GET /api/overview` | Scheduler、最近任务和结果摘要 |
+| `GET /api/overview` | RNGdle 服务、最近任务和结果摘要 |
 | `GET /api/logs` | 结构化日志；支持 `level`、`limit` 与 `after` 参数 |
 | `GET /api/settings` | 返回可编辑配置，不包含 SMTP 密码 |
 | `PUT /api/settings` | 校验、持久化并立即应用配置 |
-| `GET /preview/email` | 渲染 `result` 或 `authentication` 邮件预览 |
+| `GET /preview/email` | 渲染每日结果邮件预览；认证邮件模板仅由后台失效流程使用 |
 | `POST /api/email/send` | 手动发送当前结果或登录失效邮件 |
 | `POST /api/auth-link` | 在等待认证时提交 RNGdle magic link |
 
@@ -214,13 +215,16 @@ ssh -L 3000:127.0.0.1:3000 user@server
 
 ## 结果邮件
 
-HTML 邮件使用与 RNGdle 结果页一致的层级：
+HTML 邮件使用适合 Gmail、Outlook 等客户端的现代系统字体栈（Inter、Segoe UI、system-ui、Arial），数字区域使用 `tabular-nums` 保持对齐，不依赖 Courier New 或客户端安装 Space Mono：
 
 - 居中的当天数字框
+- 根据整体分位数着色的 Trash、Common、Uncommon、Rare、Epic、Anomaly 或 Mythic 数字框
 - 当次 EP 胶囊
 - Lifetime EP
-- Badge breakdown 与每个 badge 的 EP
+- Badge breakdown、每个 badge 的 rarity 框、描述、NEW 标记和 EP
 - RNGdle 跳转按钮
+
+badge rarity 使用 [RNGdle 官方 rarity 规则](https://www.rngdle.com/about) 的 EP 阈值：`<1,000` Common、`<10,000` Uncommon、`<100,000` Rare、`<1,000,000` Epic、`<10,000,000` Anomaly，以上为 Mythic。邮件 CSS 全部内联，Gmail、Outlook 等客户端即使不加载项目字体也会回退到兼容的系统字体。
 
 ![RNGdle result email](docs/email-result.png)
 
@@ -235,16 +239,16 @@ HTML 邮件使用与 RNGdle 结果页一致的层级：
 - `email_pending`：roll 已保存，仅需重试邮件。
 - `success`：roll 与邮件均完成，当天不再执行。
 
-在发送邮件前，roll 结果会先原子写入 `state.json`。因此 SMTP 故障不会导致再次点击 `GENERATE`。进程锁带心跳机制，用于防止 scheduler 和手动任务同时操作同一个浏览器 profile。
+在发送邮件前，roll 结果会先原子写入 `state.json`。因此 SMTP 故障不会导致再次点击 `GENERATE`。进程锁带心跳机制，用于防止 rngdle 服务和手动任务同时操作同一个浏览器 profile。
 
 ## 手动执行
 
-`once` 会立即检查当天任务，但仍遵守当天 `success` 状态。由于 scheduler、once 和 auth 共用端口及浏览器 profile，应先停止 scheduler：
+`once` 会立即检查当天任务，但仍遵守当天 `success` 状态。由于 rngdle 服务和 once 共用端口及浏览器 profile，应先停止 rngdle 服务：
 
 ```bash
-docker compose stop scheduler
+docker compose stop rngdle
 docker compose --profile tools run --rm --service-ports once
-docker compose up -d scheduler
+docker compose up -d rngdle
 ```
 
 ## 数据与备份
@@ -283,17 +287,17 @@ docker run --rm \
 docker compose ps
 
 # 实时日志
-docker compose logs -f scheduler
+docker compose logs -f rngdle
 
 # 重启
-docker compose restart scheduler
+docker compose restart rngdle
 
 # 停止
 docker compose down
 
 # 更新并重建
-docker compose build --pull scheduler
-docker compose up -d --force-recreate scheduler
+docker compose build --pull rngdle
+docker compose up -d --force-recreate rngdle
 ```
 
 `docker compose down` 不会删除 named volume。不要使用 `docker compose down -v`，除非确定要清除登录状态和历史记录。
@@ -303,7 +307,7 @@ docker compose up -d --force-recreate scheduler
 ### Control 页面打不开
 
 ```bash
-docker compose ps scheduler
+docker compose ps rngdle
 curl -i http://localhost:3000/api/status
 ```
 
@@ -312,7 +316,7 @@ curl -i http://localhost:3000/api/status
 ### RNGdle DNS 或网络错误
 
 ```bash
-docker compose exec scheduler getent hosts www.rngdle.com
+docker compose exec rngdle getent hosts www.rngdle.com
 ```
 
 临时 DNS 故障会写入当天状态，并按照 `RETRY_MINUTES` 自动重试。
@@ -347,7 +351,6 @@ pnpm install
 install -m 600 .env.example .env
 cp config/config.example.yaml config/config.yaml
 pnpm test
-pnpm auth
 pnpm once
 pnpm start
 ```
@@ -361,7 +364,7 @@ src/
 ├── config.js       # YAML、环境变量和严格校验
 ├── control.js      # Control HTTP/API 服务
 ├── control-page.js # 四视图 Control 前端
-├── index.js        # scheduler/auth/once 入口
+├── index.js        # rngdle/once 入口
 ├── logger.js       # 结构化日志和内存缓冲
 ├── mail.js         # SMTP transport 与邮件模板
 ├── rngdle.js       # Playwright 登录、API 检查和 roll
@@ -372,6 +375,6 @@ src/
 
 config/             # 配置模板与本机实际配置
 test/               # Node.js 单元测试
-compose.yaml        # scheduler、auth、once 服务
+compose.yaml        # rngdle、once 服务
 Dockerfile          # Playwright + pnpm 生产镜像
 ```

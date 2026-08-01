@@ -19,16 +19,16 @@ async function runOnce(config, control) {
   await runDailyWorkflow(config, date, now, control);
 }
 
-async function runScheduler(config, control) {
+async function runAutomation(config, control) {
   let stopping = false;
   const stop = (signal) => {
-    log("info", "Stopping scheduler", { signal });
+    log("info", "Stopping RNGdle service", { signal });
     stopping = true;
   };
   process.once("SIGINT", () => stop("SIGINT"));
   process.once("SIGTERM", () => stop("SIGTERM"));
 
-  log("info", "Scheduler started", {
+    log("info", "RNGdle service started", {
     timezone: config.timezone,
     time: config.schedule.time,
     retryMinutes: config.schedule.retryMinutes,
@@ -50,14 +50,14 @@ async function runScheduler(config, control) {
         await runDailyWorkflow(config, date, now, control);
       }
     } catch (error) {
-      log("error", "Scheduler tick failed", { error: errorSummary(error) });
+      log("error", "RNGdle service tick failed", { error: errorSummary(error) });
     }
     if (!stopping) await sleep(config.schedule.pollSeconds * 1_000);
   }
 }
 
 async function main() {
-  const command = process.argv[2] ?? "scheduler";
+  const command = process.argv[2] ?? "rngdle";
   const config = await loadConfig();
   await fs.mkdir(config.storage.directory, { recursive: true });
   if (await loadRuntimeSettings(config)) {
@@ -65,14 +65,13 @@ async function main() {
   }
   const control = await createControlServer(config);
   try {
-    if (command === "auth") {
-      await waitForInteractiveAuthentication(config, control);
-    } else if (command === "once") {
+    if (command === "once") {
       await runOnce(config, control);
-    } else if (command === "scheduler") {
-      await runScheduler(config, control);
+    } else if (command === "rngdle") {
+      await waitForInteractiveAuthentication(config, control);
+      await runAutomation(config, control);
     } else {
-      throw new Error(`Unknown command: ${command}. Use auth, once, or scheduler.`);
+      throw new Error(`Unknown command: ${command}. Use once or rngdle.`);
     }
   } finally {
     await control.close();

@@ -14,4 +14,4 @@ COPY config/config.example.yaml ./config/config.example.yaml
 
 EXPOSE 3000
 
-CMD ["node", "src/index.js", "scheduler"]
+CMD ["node", "src/index.js", "rngdle"]

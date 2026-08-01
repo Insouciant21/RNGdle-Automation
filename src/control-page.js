@@ -29,10 +29,10 @@ export function renderControlPage(baseUrl) {
     @media (prefers-color-scheme:dark) { :root { color-scheme:dark; --site:#19181d; --surface:#25242a; --raised:#302f36; --prose:#f0f0f0; --prose-2:#c4c4c4; --prose-3:#9a9a9a; --outline:#52515a; --strong:#85838f; --success:#6ee7b7; --danger:#fca5a5; --warning:#fdba74; } }
     * { box-sizing:border-box; }
     html,body { height:100%; min-height:100%; }
-    body { display:flex; flex-direction:column; margin:0; overflow:hidden; background:var(--site); color:var(--prose); font:14px/1.5 var(--font-sans); letter-spacing:0; }
+    body { display:flex; flex-direction:column; margin:0; overflow:hidden; background:var(--site); color:var(--prose); font:14px/1.5 var(--font-sans); font-kerning:normal; letter-spacing:0; }
     button,input,select { font:inherit; }
     .topbar { flex:0 0 auto; min-height:50px; display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:stretch; gap:12px; padding:0 16px; border-bottom:1px solid var(--outline); background:var(--site); }
-    .brand { grid-column:1; display:inline-flex; align-items:center; justify-self:start; gap:9px; color:var(--prose); font-size:17px; font-weight:800; text-decoration:none; }
+    .brand { grid-column:1; display:inline-flex; align-items:center; justify-self:start; gap:9px; color:var(--prose); font:800 18px/1.2 var(--font-sans); letter-spacing:.04em; text-decoration:none; }
     .brand img { width:24px; height:24px; border-radius:5px; }
     .brand-context,.mono,.label { font-family:var(--font-mono); }
     .brand-context { color:var(--prose-3); font-size:10px; text-transform:uppercase; }
@@ -41,17 +41,17 @@ export function renderControlPage(baseUrl) {
     .dot.waiting,.dot.error { background:var(--danger); }
     .dot.authenticated,.dot.idle,.dot.success { background:var(--success); }
     .tabs { grid-column:2; display:flex; align-self:stretch; justify-content:center; min-width:0; }
-    .tab { min-width:96px; min-height:49px; padding:10px 14px; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--prose-3); font:700 11px/1.2 var(--font-mono); text-transform:uppercase; cursor:pointer; }
+    .tab { min-width:96px; min-height:49px; padding:10px 14px; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--prose-3); font:700 11px/1.2 var(--font-sans); letter-spacing:.08em; text-transform:uppercase; cursor:pointer; }
     .tab:hover { color:var(--prose); background:var(--raised); }
     .tab.active { border-bottom-color:var(--prose); color:var(--prose); }
     .main-scroll { position:relative; flex:1 1 auto; min-height:0; overflow:auto; }
     main { width:100%; max-width:1040px; margin:0 auto; padding:36px 20px 56px; }
     .view[hidden] { display:none; }
-    .view-title { margin:0; font-size:20px; line-height:1.3; text-transform:uppercase; }
+    .view-title { margin:0; color:var(--prose); font:700 22px/1.25 var(--font-sans); }
     .view-kicker { margin:3px 0 24px; color:var(--prose-3); font:700 11px/1.4 var(--font-mono); text-transform:uppercase; }
     .status-hero { text-align:center; padding:18px 0 36px; }
     .status-frame { display:flex; align-items:center; justify-content:center; width:min(100%,360px); min-height:94px; margin:0 auto; padding:16px; border:3px solid var(--strong); border-radius:8px; background:var(--surface); }
-    .status-copy { max-width:100%; color:var(--prose); font:700 26px/1.2 var(--font-mono); text-transform:uppercase; overflow-wrap:anywhere; }
+    .status-copy { max-width:100%; color:var(--prose); font:700 24px/1.2 var(--font-sans); overflow-wrap:anywhere; }
     .meta { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:9px; margin:14px 0 0; color:var(--prose-3); font:700 11px/1.3 var(--font-mono); text-transform:uppercase; }
     .tag { display:inline-block; padding:3px 8px; border:1px solid var(--outline); border-radius:4px; background:var(--raised); color:var(--prose-2); font:700 10px/1.3 var(--font-mono); text-transform:uppercase; }
     .tag.waiting,.tag.failed,.tag.error { color:var(--danger); }
@@ -60,11 +60,33 @@ export function renderControlPage(baseUrl) {
     .section { min-width:0; }
     .section + .section { margin-top:32px; }
     .section-heading { display:flex; align-items:end; justify-content:space-between; gap:14px; margin-bottom:10px; }
-    .section-heading h2 { margin:0; font-size:16px; line-height:1.35; text-transform:uppercase; }
+    .section-heading h2 { margin:0; color:var(--prose); font:700 17px/1.3 var(--font-sans); }
     .section-meta { color:var(--prose-3); font:700 10px/1.4 var(--font-mono); text-transform:uppercase; }
     .panel { border:1px solid var(--outline); border-radius:8px; background:var(--surface); overflow:hidden; }
     .result-summary { padding:22px; text-align:center; }
-    .roll-number { display:inline-block; min-width:190px; padding:12px 20px; border:3px solid var(--strong); border-radius:8px; color:var(--prose-2); font:700 34px/1.3 var(--font-mono); }
+    .roll-number { display:inline-block; min-width:190px; padding:12px 20px; border:3px solid var(--rarity-border,var(--strong)); border-radius:10px; background:var(--rarity-card-bg,var(--surface)); color:var(--rarity-text,var(--prose-2)); box-shadow:0 0 14px var(--rarity-accent,#d1d5db); font:700 34px/1.3 var(--font-mono); font-variant-numeric:tabular-nums; }
+    .roll-rarity { display:flex; align-items:center; justify-content:center; gap:8px; width:max-content; margin:12px auto 0; padding:4px 9px; border:1px solid var(--rarity-border,#d1d5db); border-radius:4px; background:var(--rarity-bg,#f9fafb); color:var(--rarity-text,#6b7280); font:700 10px/1.3 var(--font-mono); text-transform:uppercase; }
+    .rarity-trash { --rarity-bg:#fffbeb; --rarity-card-bg:linear-gradient(135deg,#fffbeb,#fff7ed); --rarity-border:#d97706; --rarity-text:#92400e; --rarity-accent:#c8a87c; }
+    .rarity-common { --rarity-bg:#f9fafb; --rarity-card-bg:linear-gradient(135deg,#f3f4f6,#fff); --rarity-border:#9ca3af; --rarity-text:#4b5563; --rarity-accent:#d1d5db; }
+    .rarity-uncommon { --rarity-bg:#ecfdf5; --rarity-card-bg:linear-gradient(135deg,#d1fae5,#f0fdf4); --rarity-border:#10b981; --rarity-text:#047857; --rarity-accent:#6ee7b7; }
+    .rarity-rare { --rarity-bg:#eff6ff; --rarity-card-bg:linear-gradient(135deg,#dbeafe,#f0f9ff); --rarity-border:#3b82f6; --rarity-text:#1d4ed8; --rarity-accent:#93c5fd; }
+    .rarity-epic { --rarity-bg:#f5f3ff; --rarity-card-bg:linear-gradient(135deg,#ede9fe,#fdf4ff); --rarity-border:#8b5cf6; --rarity-text:#6d28d9; --rarity-accent:#c4b5fd; }
+    .rarity-anomaly { --rarity-bg:#fff7ed; --rarity-card-bg:linear-gradient(135deg,#fed7aa,#fffbeb); --rarity-border:#f97316; --rarity-text:#c2410c; --rarity-accent:#fdba74; }
+    .rarity-mythic { --rarity-bg:#fff1f2; --rarity-card-bg:linear-gradient(135deg,#ffe4e6,#faf5ff 52%,#cffafe); --rarity-border:#db2777; --rarity-text:#b91c1c; --rarity-accent:#f9a8d4; }
+    .rarity-unknown { --rarity-bg:#f9fafb; --rarity-card-bg:linear-gradient(135deg,#f3f4f6,#fff); --rarity-border:#d1d5db; --rarity-text:#6b7280; --rarity-accent:#d1d5db; }
+    .badge-breakdown { padding:0 14px 14px; }
+    .badge-breakdown-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 0 8px; border-top:1px solid var(--outline); color:var(--prose); font-size:13px; font-weight:800; text-transform:uppercase; }
+    .badge-list { display:grid; gap:7px; }
+    .badge-item { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:9px; align-items:start; padding:9px 10px; border:1px solid var(--rarity-border,#d1d5db); border-left-width:3px; border-radius:6px; background:var(--rarity-bg,#f9fafb); }
+    .badge-emoji { min-width:22px; font-size:17px; line-height:22px; text-align:center; }
+    .badge-copy { min-width:0; }
+    .badge-name { color:var(--prose); font:600 13px/1.35 var(--font-sans); overflow-wrap:anywhere; }
+    .badge-description { margin-top:3px; color:var(--prose-3); font:12px/1.4 var(--font-sans); overflow-wrap:anywhere; }
+    .badge-meta { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:6px; min-width:0; text-align:right; }
+    .badge-rarity { display:inline-block; padding:3px 6px; border:1px solid var(--rarity-border,#d1d5db); border-radius:4px; color:var(--rarity-text,#6b7280); font:700 10px/1.25 var(--font-sans); letter-spacing:.04em; text-transform:uppercase; }
+    .badge-score { display:inline-block; padding:3px 7px; border:1px solid #fbbf24; border-radius:999px; background:#fffbeb; color:#b45309; font:600 11px/1.25 var(--font-mono); font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .badge-new { margin-left:4px; color:#92400e; font-size:9px; }
+    .badge-empty { padding:12px; color:var(--prose-3); font:11px/1.4 var(--font-mono); text-align:center; text-transform:uppercase; }
     .stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border-top:1px solid var(--outline); }
     .stat { min-width:0; padding:13px 12px; text-align:center; }
     .stat + .stat { border-left:1px solid var(--outline); }
@@ -74,11 +96,13 @@ export function renderControlPage(baseUrl) {
     .detail-row + .detail-row { border-top:1px solid var(--outline); }
     .detail-label { flex:0 0 auto; color:var(--prose-3); font:700 10px/1.3 var(--font-mono); text-transform:uppercase; }
     .detail-value { min-width:0; color:var(--prose); font:700 12px/1.4 var(--font-mono); text-align:right; overflow-wrap:anywhere; }
-    .auth-actions { padding:14px; }
+    .auth-actions,.sidebar-actions { padding:14px; }
+    .sidebar-actions { display:grid; gap:8px; }
+    .sidebar-actions .button { width:100%; }
     .field-label { display:block; margin:15px 0 6px; color:var(--prose-3); font:700 10px/1.3 var(--font-mono); text-transform:uppercase; }
-    .input,.select { width:100%; min-height:42px; padding:9px 11px; border:1px solid var(--strong); border-radius:6px; outline:0; background:var(--site); color:var(--prose); font:12px/1.4 var(--font-mono); }
+    .input,.select { width:100%; min-height:42px; padding:9px 11px; border:1px solid var(--strong); border-radius:6px; outline:0; background:var(--site); color:var(--prose); font:14px/1.4 var(--font-sans); }
     .input:focus,.select:focus { border-color:var(--prose); box-shadow:0 0 0 1px var(--prose); }
-    .button { display:inline-flex; align-items:center; justify-content:center; min-height:40px; padding:9px 14px; border:2px solid var(--prose); border-radius:6px; background:var(--prose); color:var(--surface); font:700 11px/1.3 var(--font-mono); text-align:center; text-decoration:none; text-transform:uppercase; cursor:pointer; }
+    .button { display:inline-flex; align-items:center; justify-content:center; min-height:40px; padding:9px 14px; border:2px solid var(--prose); border-radius:6px; background:var(--prose); color:var(--surface); font:700 11px/1.3 var(--font-sans); letter-spacing:.06em; text-align:center; text-decoration:none; text-transform:uppercase; cursor:pointer; }
     .button.block { width:100%; }
     .button.secondary { background:transparent; color:var(--prose); }
     .button.quiet { border-color:var(--outline); background:var(--surface); color:var(--prose-2); }
@@ -98,15 +122,8 @@ export function renderControlPage(baseUrl) {
     .log-level.error { color:var(--danger); }
     .log-message { min-width:0; color:var(--prose); overflow-wrap:anywhere; }
     .log-fields { grid-column:3; margin:0; color:var(--prose-3); white-space:pre-wrap; overflow-wrap:anywhere; }
-    .segmented { display:inline-flex; border:1px solid var(--outline); border-radius:6px; background:var(--surface); overflow:hidden; }
-    .segment { min-height:38px; padding:8px 12px; border:0; background:transparent; color:var(--prose-3); font:700 10px/1.3 var(--font-mono); text-transform:uppercase; cursor:pointer; }
-    .segment + .segment { border-left:1px solid var(--outline); }
-    .segment.active { background:var(--prose); color:var(--surface); }
-    .email-heading { align-items:flex-end; }
-    .email-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; }
-    .email-feedback { margin:0 0 10px; text-align:right; }
-    .preview-scroll { contain:paint; position:relative; height:820px; border:1px solid var(--outline); border-radius:8px; background:#fafafa; overflow:auto; }
-    .preview-frame { display:block; width:100%; min-height:100%; height:100%; border:0; background:#fafafa; }
+    .email-feedback { margin:0; }
+    .auth-page { width:min(100%,640px); margin:0 auto; }
     .settings-form { border-top:1px solid var(--outline); }
     .settings-group { display:grid; grid-template-columns:190px minmax(0,1fr); gap:28px; padding:24px 0; border-bottom:1px solid var(--outline); }
     .settings-heading h2 { margin:0; font-size:15px; line-height:1.35; text-transform:uppercase; }
@@ -117,7 +134,7 @@ export function renderControlPage(baseUrl) {
     .form-field .field-label { margin:0 0 6px; }
     .settings-actions { display:flex; align-items:center; justify-content:flex-end; gap:14px; padding-top:20px; }
     .secret-state { color:var(--success); }
-    .main-scroll.ps,.log-panel.ps,.preview-scroll.ps { overflow:hidden !important; }
+    .main-scroll.ps,.log-panel.ps { overflow:hidden !important; }
     .ps--active-y > .ps__rail-y { width:10px; opacity:.5; background:transparent; z-index:20; }
     .ps--active-x > .ps__rail-x { height:10px; opacity:.5; background:transparent; z-index:20; }
     .ps .ps__rail-y:hover,.ps .ps__rail-y:focus,.ps .ps__rail-y.ps--clicking,.ps .ps__rail-x:hover,.ps .ps__rail-x:focus,.ps .ps__rail-x.ps--clicking { opacity:1; background:var(--raised); }
@@ -125,8 +142,8 @@ export function renderControlPage(baseUrl) {
     .ps__thumb-x { bottom:2px; height:5px; border-radius:4px; background:var(--strong); }
     .ps__rail-y:hover > .ps__thumb-y,.ps__rail-y:focus > .ps__thumb-y,.ps__rail-y.ps--clicking .ps__thumb-y { width:5px; background:var(--prose-2); }
     .ps__rail-x:hover > .ps__thumb-x,.ps__rail-x:focus > .ps__thumb-x,.ps__rail-x.ps--clicking .ps__thumb-x { height:5px; background:var(--prose-2); }
-    @media (max-width:760px) { .topbar { grid-template-columns:minmax(0,1fr) auto; gap:0; padding:0; } .brand { grid-column:1; grid-row:1; min-height:49px; padding:7px 12px; } .header-state { grid-column:2; grid-row:1; min-height:49px; padding:7px 12px; } .tabs { grid-column:1/-1; grid-row:2; width:100%; border-top:1px solid var(--outline); overflow-x:auto; } .tab { flex:1 0 78px; min-width:78px; min-height:43px; padding:10px 8px; } main { padding:28px 16px 44px; } .overview-grid { grid-template-columns:1fr; } .settings-group { grid-template-columns:1fr; gap:14px; } .log-row { grid-template-columns:1fr auto; gap:4px 10px; } .log-message,.log-fields { grid-column:1/-1; } .log-panel { height:460px; } .email-heading { align-items:stretch; flex-direction:column; } .email-actions { justify-content:flex-start; } .email-feedback { text-align:left; } .preview-scroll { height:720px; } }
-    @media (max-width:520px) { .brand-context { display:none; } .header-state { max-width:100%; } main { padding:24px 12px 36px; } .status-hero { padding-top:4px; } .status-frame { min-height:82px; } .status-copy { font-size:21px; } .stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .stat:nth-child(3) { border-left:0; } .stat:nth-child(n+3) { border-top:1px solid var(--outline); } .form-grid { grid-template-columns:1fr; } .form-field.full { grid-column:auto; } .settings-actions { align-items:stretch; flex-direction:column; } .settings-actions .button { width:100%; } .toolbar { align-items:stretch; flex-direction:column; } .toolbar-group { justify-content:space-between; } .email-actions .segmented { width:100%; } .email-actions .segment { flex:1; } .email-actions .button { flex:1; } .preview-scroll { height:660px; } }
+    @media (max-width:760px) { .topbar { grid-template-columns:minmax(0,1fr) auto; gap:0; padding:0; } .brand { grid-column:1; grid-row:1; min-height:49px; padding:7px 12px; } .header-state { grid-column:2; grid-row:1; min-height:49px; padding:7px 12px; } .tabs { grid-column:1/-1; grid-row:2; width:100%; border-top:1px solid var(--outline); overflow-x:auto; } .tab { flex:1 0 78px; min-width:78px; min-height:43px; padding:10px 8px; } main { padding:28px 16px 44px; } .overview-grid { grid-template-columns:1fr; } .settings-group { grid-template-columns:1fr; gap:14px; } .log-row { grid-template-columns:1fr auto; gap:4px 10px; } .log-message,.log-fields { grid-column:1/-1; } .log-panel { height:460px; } }
+    @media (max-width:520px) { .brand-context { display:none; } .header-state { max-width:100%; } main { padding:24px 12px 36px; } .status-hero { padding-top:4px; } .status-frame { min-height:82px; } .status-copy { font-size:21px; } .stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .stat:nth-child(3) { border-left:0; } .stat:nth-child(n+3) { border-top:1px solid var(--outline); } .form-grid { grid-template-columns:1fr; } .form-field.full { grid-column:auto; } .settings-actions { align-items:stretch; flex-direction:column; } .settings-actions .button { width:100%; } .toolbar { align-items:stretch; flex-direction:column; } .toolbar-group { justify-content:space-between; } }
   </style>
 </head>
 <body>
@@ -135,7 +152,7 @@ export function renderControlPage(baseUrl) {
     <nav class="tabs" role="tablist" aria-label="Control views">
       <button class="tab active" role="tab" aria-selected="true" data-view="overview">Overview</button>
       <button class="tab" role="tab" aria-selected="false" data-view="logs">Logs</button>
-      <button class="tab" role="tab" aria-selected="false" data-view="email">Email</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="auth">Authentication</button>
       <button class="tab" role="tab" aria-selected="false" data-view="settings">Settings</button>
     </nav>
     <div class="header-state"><span id="header-dot" class="dot"></span><span id="header-status">Connecting</span></div>
@@ -152,28 +169,14 @@ export function renderControlPage(baseUrl) {
           <section class="section">
             <div class="section-heading"><h2>Latest roll</h2><span id="result-date" class="section-meta">No result</span></div>
             <div class="panel">
-              <div class="result-summary"><span id="roll-number" class="roll-number">------</span></div>
+              <div class="result-summary"><span id="roll-number" class="roll-number">------</span><div id="roll-rarity" class="roll-rarity rarity-unknown"><span id="roll-rarity-icon">?</span><span id="roll-rarity-label">Rarity unavailable</span></div></div>
               <div class="stats">
                 <div class="stat"><span id="earned-ep" class="stat-value">-</span><span class="stat-label">Earned EP</span></div>
                 <div class="stat"><span id="total-ep" class="stat-value">-</span><span class="stat-label">Lifetime EP</span></div>
                 <div class="stat"><span id="badge-count" class="stat-value">-</span><span class="stat-label">Badges</span></div>
                 <div class="stat"><span id="mail-state" class="stat-value">-</span><span class="stat-label">Email</span></div>
               </div>
-            </div>
-          </section>
-          <section class="section">
-            <div class="section-heading"><h2>Authentication</h2><span class="section-meta">Persistent session</span></div>
-            <div class="panel">
-              <div class="detail-row"><span class="detail-label">RNGdle account</span><strong id="rngdle-account" class="detail-value">Loading</strong></div>
-              <div class="auth-actions">
-                <a id="rngdle-link" class="button block" href="${rngdleUrl}" target="_blank" rel="noopener noreferrer">Request sign-in link</a>
-                <form id="auth-form">
-                  <label class="field-label" for="auth-link">Email magic-link URL</label>
-                  <input class="input" id="auth-link" type="url" inputmode="url" autocomplete="off" placeholder="https://www.rngdle.com/..." required>
-                  <button class="button block secondary" id="auth-submit" type="submit" style="margin-top:10px">Open in persistent browser</button>
-                </form>
-                <div id="auth-message" class="feedback" role="status"></div>
-              </div>
+              <div class="badge-breakdown"><div class="badge-breakdown-heading"><span>Badge breakdown</span><span id="badge-count-label" class="section-meta">-</span></div><div id="badge-list" class="badge-list"><div class="badge-empty">No badge data</div></div></div>
             </div>
           </section>
         </div>
@@ -187,6 +190,16 @@ export function renderControlPage(baseUrl) {
               <div class="detail-row"><span class="detail-label">Recipients</span><strong id="mail-recipients" class="detail-value">-</strong></div>
             </div>
           </section>
+          <section class="section">
+            <div class="section-heading"><h2>Email</h2><span class="section-meta">Result delivery</span></div>
+            <div class="panel">
+              <div class="sidebar-actions">
+                <button id="email-send" class="button" type="button">Send email</button>
+                <a id="preview-open" class="button quiet" href="/preview/email?type=result" target="_blank">Open preview</a>
+                <div id="email-message" class="feedback email-feedback" role="status"></div>
+              </div>
+            </div>
+          </section>
           <section id="error-section" class="section" hidden>
             <div class="section-heading"><h2>Last error</h2></div>
             <div class="panel"><div class="detail-row"><span id="last-error" class="detail-value" style="text-align:left"></span></div></div>
@@ -196,7 +209,7 @@ export function renderControlPage(baseUrl) {
     </section>
 
     <section id="view-logs" class="view" role="tabpanel" hidden>
-      <h1 class="view-title">Logs</h1><p class="view-kicker">Current scheduler process</p>
+      <h1 class="view-title">Logs</h1><p class="view-kicker">Current RNGdle service process</p>
       <div class="toolbar">
         <div class="toolbar-group"><select id="log-level" class="select" aria-label="Log level"><option value="all">All levels</option><option value="info">Info</option><option value="error">Errors</option></select><label class="check"><input id="log-auto" type="checkbox" checked>Auto refresh</label></div>
         <button id="log-refresh" class="button quiet" type="button">Refresh</button>
@@ -204,14 +217,24 @@ export function renderControlPage(baseUrl) {
       <div id="log-panel" class="log-panel" tabindex="0" aria-live="polite"><div class="log-empty">Loading logs</div></div>
     </section>
 
-    <section id="view-email" class="view" role="tabpanel" hidden>
-      <div class="section-heading email-heading">
-        <div><h1 class="view-title">Email preview</h1><p class="view-kicker" style="margin-bottom:0">Rendered message output</p></div>
-        <div class="email-actions"><div class="segmented" role="group" aria-label="Email type"><button class="segment active" type="button" data-email-type="result">Result</button><button class="segment" type="button" data-email-type="authentication">Login required</button></div><button id="email-send" class="button" type="button">Send email</button><a id="preview-open" class="button quiet" href="/preview/email?type=result" target="_blank">Open</a></div>
-      </div>
-      <div id="email-message" class="feedback email-feedback" role="status"></div>
-      <div id="preview-scroll" class="preview-scroll" tabindex="0" role="region" aria-label="Email preview">
-        <iframe id="email-frame" class="preview-frame" title="Email preview" src="/preview/email?type=result" scrolling="no"></iframe>
+    <section id="view-auth" class="view" role="tabpanel" hidden>
+      <h1 class="view-title">Authentication</h1><p class="view-kicker">Persistent RNGdle session</p>
+      <div class="auth-page">
+        <section class="section">
+          <div class="section-heading"><h2>RNGdle account</h2><span class="section-meta">Magic link</span></div>
+          <div class="panel">
+            <div class="detail-row"><span class="detail-label">Account</span><strong id="rngdle-account" class="detail-value">Loading</strong></div>
+            <div class="auth-actions">
+              <a id="rngdle-link" class="button block" href="${rngdleUrl}" target="_blank" rel="noopener noreferrer">Request sign-in link</a>
+              <form id="auth-form">
+                <label class="field-label" for="auth-link">Email magic-link URL</label>
+                <input class="input" id="auth-link" type="url" inputmode="url" autocomplete="off" placeholder="https://www.rngdle.com/..." required>
+                <button class="button block secondary" id="auth-submit" type="submit" style="margin-top:10px">Open in persistent browser</button>
+              </form>
+              <div id="auth-message" class="feedback" role="status"></div>
+            </div>
+          </div>
+        </section>
       </div>
     </section>
 
@@ -262,12 +285,9 @@ export function renderControlPage(baseUrl) {
       : { update() {} };
     const mainScrollbar = createScrollbar(byId('main-scroll'), { suppressScrollX:true, wheelPropagation:false });
     const logScrollbar = createScrollbar(byId('log-panel'), { suppressScrollX:true, wheelPropagation:false });
-    const emailScrollbar = createScrollbar(byId('preview-scroll'), { suppressScrollX:true, wheelPropagation:false });
     let activeView = 'overview';
-    let selectedEmailType = 'result';
     let mailRecipients = [];
     let settingsLoaded = false;
-    let emailPreviewDocument;
 
     async function request(url, options) {
       const response = await fetch(url, { cache:'no-store', ...options });
@@ -279,13 +299,32 @@ export function renderControlPage(baseUrl) {
     function text(id, value, fallback = '-') { byId(id).textContent = value === null || value === undefined || value === '' ? fallback : String(value); }
     function number(value) { return value === null || value === undefined ? '-' : Number(value).toLocaleString('en-US'); }
     function dateTime(value) { return value ? new Date(value).toLocaleString() : '-'; }
+    const rarityLabels = { trash:'Trash', common:'Common', uncommon:'Uncommon', rare:'Rare', epic:'Epic', anomaly:'Anomaly', mythic:'Mythic', unknown:'Rarity unavailable' };
+    const rarityIcons = { trash:'🟫', common:'⬜', uncommon:'🟩', rare:'🟦', epic:'🟪', anomaly:'🟧', mythic:'🟥', unknown:'?' };
+    const badgeRarityFromScore = (score) => { const value=Number(score); if (!Number.isFinite(value)||value<0) return 'unknown'; if(value<1000)return 'common'; if(value<10000)return 'uncommon'; if(value<100000)return 'rare'; if(value<1000000)return 'epic'; if(value<10000000)return 'anomaly'; return 'mythic'; };
+    function renderBadges(result) {
+      const list=byId('badge-list'); const badges=Array.isArray(result.badges)?result.badges:[];
+      byId('badge-count-label').textContent=badges.length+' badge'+(badges.length===1?'':'s');
+      list.replaceChildren();
+      if (!badges.length) { const empty=document.createElement('div'); empty.className='badge-empty'; empty.textContent='No badges earned'; list.append(empty); return; }
+      badges.forEach((badge)=>{
+        const rarity=rarityLabels[badge.rarity] ? badge.rarity : badgeRarityFromScore(badge.score);
+        const item=document.createElement('div'); item.className='badge-item rarity-'+rarity;
+        const emoji=document.createElement('span'); emoji.className='badge-emoji'; emoji.textContent=badge.emoji||'✨';
+        const copy=document.createElement('div'); copy.className='badge-copy';
+        const name=document.createElement('div'); name.className='badge-name'; name.textContent=badge.label||badge.id||'Unknown badge';
+        if (badge.isNew) { const fresh=document.createElement('span'); fresh.className='badge-new'; fresh.textContent='NEW'; name.append(fresh); }
+        copy.append(name);
+        if (badge.description) { const description=document.createElement('div'); description.className='badge-description'; description.textContent=badge.description; copy.append(description); }
+        const meta=document.createElement('div'); meta.className='badge-meta'; const label=document.createElement('span'); label.className='badge-rarity'; label.textContent=rarityLabels[rarity]; const score=document.createElement('span'); score.className='badge-score'; score.textContent='+'+number(badge.score)+' EP'; meta.append(label,score); item.append(emoji,copy,meta); list.append(item);
+      });
+    }
 
     function showView(name) {
       activeView = name;
       document.querySelectorAll('.view').forEach((view) => { view.hidden = view.id !== 'view-' + name; });
       document.querySelectorAll('.tab').forEach((tab) => { const selected = tab.dataset.view === name; tab.classList.toggle('active', selected); tab.setAttribute('aria-selected', String(selected)); });
       if (name === 'logs') loadLogs();
-      if (name === 'email') requestAnimationFrame(prepareEmailPreview);
       if (name === 'settings' && !settingsLoaded) loadSettings();
       byId('main-scroll').scrollTop=0;
       requestAnimationFrame(()=>mainScrollbar.update());
@@ -312,7 +351,12 @@ export function renderControlPage(baseUrl) {
           text('roll-number', data.result.number);
           text('earned-ep', number(data.result.earnedEp));
           text('total-ep', number(data.result.totalEp));
-          text('badge-count', data.result.badges);
+          text('badge-count', Array.isArray(data.result.badges) ? data.result.badges.length : data.result.badges);
+          const rarity=data.result.rarity && rarityLabels[data.result.rarity] ? data.result.rarity : 'unknown';
+          byId('roll-number').className='roll-number rarity-'+rarity;
+          byId('roll-rarity').className='roll-rarity rarity-'+rarity;
+          text('roll-rarity-icon',rarityIcons[rarity]); text('roll-rarity-label',rarityLabels[rarity]);
+          renderBadges(data.result);
         }
         if (data.latest) {
           text('run-date', data.latest.date);
@@ -349,33 +393,6 @@ export function renderControlPage(baseUrl) {
       } catch (error) { panel.textContent=error.message; }
     }
 
-    function scrollEmailPreview(delta) {
-      const panel=byId('preview-scroll'); const before=panel.scrollTop;
-      panel.scrollTop=Math.max(0,Math.min(panel.scrollHeight-panel.clientHeight,panel.scrollTop+delta));
-      return panel.scrollTop!==before;
-    }
-
-    function prepareEmailPreview() {
-      const panel=byId('preview-scroll'); const frame=byId('email-frame');
-      let previewDocument;
-      try { previewDocument=frame.contentDocument; } catch { emailScrollbar.update(); return; }
-      if (!previewDocument?.documentElement || !panel.clientHeight) { emailScrollbar.update(); return; }
-      if (previewDocument!==emailPreviewDocument) {
-        emailPreviewDocument=previewDocument;
-        previewDocument.addEventListener('wheel',(event)=>{ if(scrollEmailPreview(event.deltaY)) event.preventDefault(); },{passive:false});
-        previewDocument.addEventListener('keydown',(event)=>{ let delta=0; if(event.key==='ArrowDown') delta=40; else if(event.key==='ArrowUp') delta=-40; else if(event.key==='PageDown'||event.key===' ') delta=panel.clientHeight*.85*(event.shiftKey?-1:1); else if(event.key==='PageUp') delta=-panel.clientHeight*.85; else if(event.key==='Home') delta=-panel.scrollHeight; else if(event.key==='End') delta=panel.scrollHeight; if(delta&&scrollEmailPreview(delta)) event.preventDefault(); });
-        let touchY=null;
-        previewDocument.addEventListener('touchstart',(event)=>{ touchY=event.touches.length===1?event.touches[0].clientY:null; },{passive:true});
-        previewDocument.addEventListener('touchmove',(event)=>{ if(touchY===null||event.touches.length!==1) return; const nextY=event.touches[0].clientY; if(scrollEmailPreview(touchY-nextY)) event.preventDefault(); touchY=nextY; },{passive:false});
-      }
-      frame.style.height=panel.clientHeight+'px';
-      previewDocument.documentElement.style.setProperty('overflow','hidden','important');
-      if (previewDocument.body) previewDocument.body.style.setProperty('overflow','hidden','important');
-      const contentHeight=Math.max(previewDocument.documentElement.scrollHeight,previewDocument.body?.scrollHeight??0);
-      frame.style.height=Math.max(panel.clientHeight,contentHeight)+'px';
-      emailScrollbar.update();
-    }
-
     function setInput(id, value) { byId(id).value = value ?? ''; }
     async function loadSettings() {
       try {
@@ -391,11 +408,9 @@ export function renderControlPage(baseUrl) {
     document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click',()=>showView(tab.dataset.view)));
     byId('auth-form').addEventListener('submit',async(event)=>{ event.preventDefault(); const message=byId('auth-message'); message.className='feedback'; message.textContent=''; byId('auth-submit').disabled=true; try { const data=await request('/api/auth-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({link:byId('auth-link').value})}); message.textContent=data.message; byId('auth-link').value=''; } catch(error) { message.className='feedback error'; message.textContent=error.message; } await refreshOverview(); });
     byId('log-refresh').addEventListener('click',loadLogs); byId('log-level').addEventListener('change',loadLogs);
-    byId('email-frame').addEventListener('load',()=>requestAnimationFrame(prepareEmailPreview));
-    document.querySelectorAll('[data-email-type]').forEach((button)=>button.addEventListener('click',()=>{ selectedEmailType=button.dataset.emailType; document.querySelectorAll('[data-email-type]').forEach((item)=>item.classList.toggle('active',item===button)); const url='/preview/email?type='+encodeURIComponent(selectedEmailType)+'&t='+Date.now(); byId('preview-scroll').scrollTop=0; byId('email-frame').src=url; byId('preview-open').href=url; byId('email-message').textContent=''; }));
-    byId('email-send').addEventListener('click',async()=>{ const recipients=mailRecipients.length ? mailRecipients.join(', ') : 'the configured recipients'; const label=selectedEmailType==='result' ? 'result' : 'login required'; if(!window.confirm('Send the '+label+' email to '+recipients+'?')) return; const button=byId('email-send'); const message=byId('email-message'); button.disabled=true; button.textContent='Sending'; message.className='feedback email-feedback'; message.textContent=''; try { const data=await request('/api/email/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:selectedEmailType})}); message.textContent=data.message; } catch(error) { message.className='feedback email-feedback error'; message.textContent=error.message; } finally { button.disabled=false; button.textContent='Send email'; } });
+    byId('email-send').addEventListener('click',async()=>{ const recipients=mailRecipients.length ? mailRecipients.join(', ') : 'the configured recipients'; if(!window.confirm('Send the result email to '+recipients+'?')) return; const button=byId('email-send'); const message=byId('email-message'); button.disabled=true; button.textContent='Sending'; message.className='feedback email-feedback'; message.textContent=''; try { const data=await request('/api/email/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'result'})}); message.textContent=data.message; } catch(error) { message.className='feedback email-feedback error'; message.textContent=error.message; } finally { button.disabled=false; button.textContent='Send email'; } });
     byId('settings-form').addEventListener('submit',async(event)=>{ event.preventDefault(); const message=byId('settings-message'); const save=byId('settings-save'); message.className='feedback'; message.textContent=''; save.disabled=true; const payload={timezone:byId('timezone').value,scheduleTime:byId('schedule-time').value,retryMinutes:Number(byId('retry-minutes').value),pollSeconds:Number(byId('poll-seconds').value),browserTimeoutMs:Number(byId('browser-timeout').value),controlPublicUrl:byId('control-url').value,rngdleEmail:byId('rngdle-email').value,smtpUsername:byId('smtp-username').value,smtpFrom:byId('smtp-from').value,mailFromName:byId('sender-name').value,mailSubjectPrefix:byId('subject-prefix').value,mailTo:byId('mail-to').value,smtpHost:byId('smtp-host').value,smtpPort:Number(byId('smtp-port').value),smtpSecure:byId('smtp-secure').checked,smtpRequireTls:byId('smtp-require-tls').checked,smtpAppPassword:byId('smtp-password').value}; try { const data=await request('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); message.textContent=data.message; settingsLoaded=false; await loadSettings(); await refreshOverview(); } catch(error) { message.className='feedback error'; message.textContent=error.message; } finally { save.disabled=false; } });
-    window.addEventListener('resize',()=>{ mainScrollbar.update(); logScrollbar.update(); prepareEmailPreview(); });
+    window.addEventListener('resize',()=>{ mainScrollbar.update(); logScrollbar.update(); });
     setInterval(()=>{ refreshOverview(); if(activeView==='logs'&&byId('log-auto').checked) loadLogs(); },3000);
     refreshOverview();
   </script>

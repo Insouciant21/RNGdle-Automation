@@ -70,13 +70,18 @@ test("control APIs expose operations without exposing secrets", async (context) 
   assert.match(page, /@font-face/);
   assert.match(page, /\/assets\/fonts\/inter-latin\.woff2/);
   assert.match(page, /id="email-send"/);
+  assert.match(page, /Send email/);
+  assert.doesNotMatch(page, /Login required/);
+  assert.doesNotMatch(page, /data-email-type="authentication"/);
+  assert.match(page, /data-view="auth"/);
+  assert.doesNotMatch(page, /data-view="email"/);
   assert.match(page, /perfect-scrollbar\.min\.js/);
   assert.match(page, /new window\.PerfectScrollbar\(element, options\)/);
   assert.match(page, /: \{ update\(\) \{\} \}/);
   assert.match(page, /\.log-panel \{ contain:paint;/);
-  assert.match(page, /id="preview-scroll" class="preview-scroll"/);
-  assert.match(page, /const emailScrollbar = createScrollbar\(byId\('preview-scroll'\)/);
-  assert.match(page, /\.main-scroll\.ps,\.log-panel\.ps,\.preview-scroll\.ps \{ overflow:hidden !important; \}/);
+  assert.match(page, /id="preview-open"/);
+  assert.doesNotMatch(page, /id="email-frame"/);
+  assert.match(page, /\.main-scroll\.ps,\.log-panel\.ps \{ overflow:hidden !important; \}/);
   assert.match(page, /<header class="topbar">[\s\S]*<nav class="tabs"[\s\S]*<\/header>/);
   assert.doesNotMatch(page, /tabs-wrap/);
   const font = await fetch(`${baseUrl}/assets/fonts/space-mono-700-latin.woff2`);
@@ -93,6 +98,8 @@ test("control APIs expose operations without exposing secrets", async (context) 
 
   const overview = await (await fetch(`${baseUrl}/api/overview`)).json();
   assert.equal(overview.result.number, 123456);
+  assert.equal(overview.result.rarity, "trash");
+  assert.deepEqual(overview.result.badges, []);
   assert.equal(overview.latest.emailSent, true);
 
   const settings = await (await fetch(`${baseUrl}/api/settings`)).json();
