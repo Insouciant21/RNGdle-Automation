@@ -71,7 +71,8 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
     throw error;
   }
 
-  const raw = expandEnvironment(YAML.parse(source), env);
+  const expandedEnv = { ...env, SMTP_PASSWORD: env.SMTP_PASSWORD || env.SMTP_APP_PASSWORD || "" };
+  const raw = expandEnvironment(YAML.parse(source), expandedEnv);
   const configuredRecipients = raw.smtp?.to;
   const recipients = Array.isArray(configuredRecipients)
     ? configuredRecipients
@@ -96,11 +97,12 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
   const oauthClientId = optionalString(raw.smtp?.oauth?.clientId);
   const oauthClientSecret = optionalString(raw.smtp?.oauth?.clientSecret);
   const oauthRefreshToken = optionalString(raw.smtp?.oauth?.refreshToken);
+  const oauthAccessUrl = optionalString(raw.smtp?.oauth?.accessUrl);
   if (smtpAuthMode === "password" && !smtpPassword) {
     throw new Error("Configuration field smtp.password is required for password authentication");
   }
-  if (smtpAuthMode === "oauth2" && (!oauthClientId || !oauthClientSecret || !oauthRefreshToken)) {
-    throw new Error("smtp.oauth.clientId, clientSecret, and refreshToken are required for OAuth2 authentication");
+  if (smtpAuthMode === "oauth2" && (!oauthClientId || !oauthClientSecret || !oauthRefreshToken || !oauthAccessUrl)) {
+    throw new Error("smtp.oauth.clientId, clientSecret, refreshToken, and accessUrl are required for OAuth2 authentication");
   }
   const config = {
     timezone: requiredString(raw.timezone ?? "Asia/Shanghai", "timezone"),
@@ -133,7 +135,7 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
         clientId: oauthClientId,
         clientSecret: oauthClientSecret,
         refreshToken: oauthRefreshToken,
-        tenantId: optionalString(raw.smtp?.oauth?.tenantId) ?? "consumers",
+        accessUrl: oauthAccessUrl,
       },
       from: optionalString(raw.smtp?.from) ?? smtpUsername,
       to: recipients.map((recipient, index) => requiredString(recipient, `smtp.to[${index}]`)),

@@ -1,8 +1,8 @@
 # RNGdle Automation
 
-> Self-hosted RNGdle automation with persistent login, retry-safe scheduling, Gmail reports, and a local control dashboard.
+> Self-hosted RNGdle automation with persistent login, retry-safe scheduling, SMTP reports, and a local control dashboard.
 
-每天在 UTC+8 `08:02` 自动完成 [RNGdle](https://www.rngdle.com) roll，读取当天数字、获得 EP、Lifetime EP 与 badges，并通过 Gmail 发送结果邮件。项目使用持久化浏览器会话、幂等状态记录和 Docker Compose 常驻运行。
+每天在 UTC+8 `08:02` 自动完成 [RNGdle](https://www.rngdle.com) roll，读取当天数字、获得 EP、Lifetime EP 与 badges，并通过 SMTP 发送结果邮件。项目使用持久化浏览器会话、幂等状态记录和 Docker Compose 常驻运行。
 
 [快速开始](#快速开始) · [配置参考](#配置参考) · [Control 页面](#control-页面) · [重试与幂等](#重试与幂等) · [运维](#常用运维) · [安全](#安全)
 
@@ -15,7 +15,7 @@
 | 自动调度 | 默认每天 `08:02 Asia/Shanghai` 执行，失败后每 30 分钟重试 |
 | 持久登录 | Playwright persistent context 保存 cookies；失效后进入交互认证 |
 | 幂等执行 | 已有 roll 直接复用；邮件失败只重试投递，不会再次生成数字 |
-| 邮件报告 | Gmail SMTP 同时发送 RNGdle 风格 HTML 与纯文本结果 |
+| 邮件报告 | SMTP 同时发送 RNGdle 风格 HTML 与纯文本结果 |
 | Control | 提供状态、结构化日志、邮件预览、认证入口和运行时设置 |
 | 容器部署 | Compose 管理 scheduler、数据卷和健康检查，无需 VNC |
 
@@ -39,7 +39,7 @@ Control 自托管 Inter 与 Space Mono 字体。运行状态保存在 `state.jso
 点击 GENERATE
     |
     v
-保存结果 ----> Gmail 发送 ----> 标记 success
+保存结果 ----> SMTP 发送 ----> 标记 success
 ```
 
 RNGdle 当前使用 email magic link 和 Cloudflare Turnstile，而不是数字验证码。Turnstile 在宿主机浏览器完成，magic link 由容器内的 headless Chromium 打开并保存会话。
@@ -58,7 +58,7 @@ RNGdle 当前使用 email magic link 和 Cloudflare Turnstile，而不是数字�
 
 - Docker Engine
 - Docker Compose v2
-- 可访问 `www.rngdle.com` 和 `smtp.gmail.com`
+- 可访问 `www.rngdle.com` 和配置的 SMTP 服务器
 
 本地开发还需要：
 
@@ -80,21 +80,20 @@ chmod 600 config/config.yaml
 ```dotenv
 RNGDLE_EMAIL=your-rngdle-account@example.com
 
-SMTP_USER=sender@gmail.com
-SMTP_APP_PASSWORD=your-google-app-password
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=your-smtp-user@example.com
+SMTP_PASSWORD=your-smtp-password
 MAIL_TO=receiver@example.com
 ```
 
-`RNGDLE_EMAIL` 与 Gmail 发件地址可以不同。不要将 Google 账号主密码填入 `SMTP_APP_PASSWORD`。
+`RNGDLE_EMAIL` 与 SMTP 发件账号可以不同。`SMTP_PASSWORD` 应填写 SMTP 服务商要求的密码、应用密码或令牌；现有配置中的 `SMTP_APP_PASSWORD` 仍作为兼容别名读取。
 
-### 2. 配置 Gmail
+### 2. 配置 SMTP
 
-1. 为 Google 账号开启两步验证。
-2. 在 Google 账号安全设置中创建应用专用密码。
-3. 将生成的 16 位应用专用密码写入 `SMTP_APP_PASSWORD`。
-4. `SMTP_USER` 填写完整 Gmail 地址。
-
-Google Workspace 账号是否允许应用专用密码取决于管理员策略。
+1. 填写 SMTP 主机、端口、TLS 选项和认证方式。
+2. 按服务商要求填写 SMTP 用户名和密码、应用密码或令牌。
+3. 如果使用 OAuth2，同时填写 `SMTP_OAUTH_*` 配置，并提供服务商的 token endpoint。
 
 ### 3. 首次认证 RNGdle
 
@@ -137,13 +136,14 @@ Docker Compose 从 `.env` 注入启动配置，[config/config.example.yaml](conf
 | `POLL_SECONDS` | `30` | 调度状态轮询间隔 |
 | `RNGDLE_EMAIL` | 必填 | RNGdle 登录邮箱 |
 | `RNGDLE_BASE_URL` | `https://www.rngdle.com` | RNGdle 地址 |
-| `SMTP_HOST` | `smtp.gmail.com` | SMTP 服务器 |
+| `SMTP_HOST` | `smtp.example.com` | SMTP 服务器 |
 | `SMTP_PORT` | `587` | STARTTLS 端口 |
 | `SMTP_SECURE` | `false` | `587` 使用 STARTTLS，因此为 `false` |
 | `SMTP_REQUIRE_TLS` | `true` | 强制升级 TLS |
-| `SMTP_AUTH_MODE` | `password` | Gmail 应用专用密码模式 |
-| `SMTP_USER` | 必填 | 完整 Gmail 发件地址 |
-| `SMTP_APP_PASSWORD` | 必填 | Google 应用专用密码 |
+| `SMTP_AUTH_MODE` | `password` | `password` 或 `oauth2` |
+| `SMTP_USER` | 必填 | SMTP 登录用户名 |
+| `SMTP_PASSWORD` | 必填 | SMTP 密码、应用密码或令牌；兼容旧变量 `SMTP_APP_PASSWORD` |
+| `SMTP_OAUTH_ACCESS_URL` | 空 | OAuth2 token endpoint |
 | `MAIL_FROM` | `SMTP_USER` | 邮件 From；留空时使用 SMTP 用户 |
 | `MAIL_FROM_NAME` | `RNGdle Today` | 收件箱中显示的发件人昵称 |
 | `MAIL_TO` | 必填 | 一个或多个收件人，逗号分隔 |
@@ -172,7 +172,7 @@ Control 将品牌、四视图导航和 scheduler 状态集中在页面 header �
 | `Overview` | Scheduler 状态、最近 roll、EP、badges、邮件状态、重试信息和 RNGdle 认证 |
 | `Logs` | 当前进程最近 250 条结构化日志、级别筛选、手动与自动刷新 |
 | `Email` | 预览并手动发送最近结果邮件或登录失效邮件 |
-| `Settings` | 热更新调度、浏览器超时、账号、收件人、主题和 Gmail SMTP 参数 |
+| `Settings` | 热更新调度、浏览器超时、账号、收件人、主题和 SMTP 参数 |
 
 ![RNGdle Control email](docs/control-email.png)
 
@@ -188,7 +188,7 @@ Control 将品牌、四视图导航和 scheduler 状态集中在页面 header �
 | `waiting` | RNGdle 登录失效，等待提交 magic link |
 | `authenticated` | 新会话已确认，待执行任务将继续 |
 
-Settings 中的 App Password 输入始终为空，只显示 `(configured)` 或 `(missing)`。留空保存会保留现有密码；输入新值才会替换。设置文件使用 `0600` 权限原子写入。
+Settings 中的 SMTP password 输入始终为空，只显示 `(configured)` 或 `(missing)`。留空保存会保留现有密码；输入新值才会替换。设置文件使用 `0600` 权限原子写入。
 
 Logs 只保留当前 scheduler 进程最近 250 条记录，容器重启后清空；需要长期历史时使用 `docker compose logs` 或配置 Docker 日志驱动。Email 视图发送前会确认当前模板和收件人；手动发送会写入日志，但不会改变每日任务状态。
 
@@ -317,12 +317,11 @@ docker compose exec scheduler getent hosts www.rngdle.com
 
 临时 DNS 故障会写入当天状态，并按照 `RETRY_MINUTES` 自动重试。
 
-### Gmail 返回认证错误
+### SMTP 返回认证错误
 
-- 确认 `SMTP_USER` 是完整 Gmail 地址。
-- 确认使用应用专用密码，而不是 Google 账号主密码。
-- 确认 Google 两步验证仍开启。
-- 修改 Google 账号密码后，需要重新生成应用专用密码。
+- 确认 `SMTP_HOST`、`SMTP_PORT` 和 TLS 选项符合服务商要求。
+- 确认 `SMTP_USER` 和 `SMTP_PASSWORD` 使用服务商要求的认证信息。
+- OAuth2 模式下确认 `SMTP_OAUTH_ACCESS_URL` 和令牌配置正确。
 
 ### 登录失效
 
@@ -338,7 +337,7 @@ docker compose exec scheduler getent hosts www.rngdle.com
 - Settings API 不返回 SMTP 密码，并拒绝跨域写请求。
 - 邮件预览 iframe 使用 CSP 禁止脚本、表单和外部连接。
 - magic link 提交接口限制请求体大小，并只接受 RNGdle HTTPS 域名。
-- 建议定期轮换 Gmail 应用专用密码，并限制 `.env` 和备份文件的访问权限。
+- 建议定期轮换 SMTP 密码或令牌，并限制 `.env` 和备份文件的访问权限。
 
 ## 本地开发
 
@@ -353,7 +352,7 @@ pnpm once
 pnpm start
 ```
 
-测试覆盖配置展开、运行时设置持久化、密码保护、Control API、同源写入、邮件预览 CSP、Gmail 默认值、时区调度、重试条件、RNGdle API 结果标准化、magic link 域名限制、日志脱敏和邮件模板转义。
+测试覆盖配置展开、运行时设置持久化、密码保护、Control API、同源写入、邮件预览 CSP、SMTP 默认值、时区调度、重试条件、RNGdle API 结果标准化、magic link 域名限制、日志脱敏和邮件模板转义。
 
 ## 项目结构
 
@@ -364,7 +363,7 @@ src/
 ├── control-page.js # 四视图 Control 前端
 ├── index.js        # scheduler/auth/once 入口
 ├── logger.js       # 结构化日志和内存缓冲
-├── mail.js         # Gmail transport 与邮件模板
+├── mail.js         # SMTP transport 与邮件模板
 ├── rngdle.js       # Playwright 登录、API 检查和 roll
 ├── schedule.js     # UTC+8 调度判断
 ├── settings.js     # 运行时设置校验、持久化和热应用

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.17.0",
-  "description": "Self-hosted RNGdle automation with persistent login, retry-safe scheduling, Gmail reports, and a local control dashboard.",
+  "description": "Self-hosted RNGdle automation with persistent login, retry-safe scheduling, SMTP reports, and a local control dashboard.",
   "scripts": {
     "auth": "node src/index.js auth",
     "once": "node src/index.js once",

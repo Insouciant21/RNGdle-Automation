@@ -20,18 +20,18 @@ control:
   publicUrl: "${CONTROL_PUBLIC_URL:-http://localhost:3000}"
 
 smtp:
-  host: "${SMTP_HOST:-smtp.gmail.com}"
+  host: "${SMTP_HOST:-smtp.example.com}"
   port: "${SMTP_PORT:-587}"
   secure: "${SMTP_SECURE:-false}"
   requireTls: "${SMTP_REQUIRE_TLS:-true}"
   authMode: "${SMTP_AUTH_MODE:-password}"
   username: "${SMTP_USER}"
-  password: "${SMTP_APP_PASSWORD:-}"
+  password: "${SMTP_PASSWORD:-}"
   oauth:
     clientId: "${SMTP_OAUTH_CLIENT_ID:-}"
     clientSecret: "${SMTP_OAUTH_CLIENT_SECRET:-}"
     refreshToken: "${SMTP_OAUTH_REFRESH_TOKEN:-}"
-    tenantId: "${SMTP_OAUTH_TENANT_ID:-consumers}"
+    accessUrl: "${SMTP_OAUTH_ACCESS_URL:-}"
   from: "${MAIL_FROM:-}"
   to: "${MAIL_TO}"
 

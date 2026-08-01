@@ -18,7 +18,7 @@ function transport(config) {
           clientId: config.smtp.oauth.clientId,
           clientSecret: config.smtp.oauth.clientSecret,
           refreshToken: config.smtp.oauth.refreshToken,
-          accessUrl: `https://login.microsoftonline.com/${encodeURIComponent(config.smtp.oauth.tenantId)}/oauth2/v2.0/token`,
+          ...(config.smtp.oauth.accessUrl ? { accessUrl: config.smtp.oauth.accessUrl } : {}),
         }
       : {
           user: config.smtp.username,

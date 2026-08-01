@@ -233,7 +233,7 @@ export function renderControlPage(baseUrl) {
           <div class="settings-heading"><h2>Delivery</h2><p>Account and recipients</p></div>
           <div class="form-grid">
             <div class="form-field"><label class="field-label" for="rngdle-email">RNGdle email</label><input class="input" id="rngdle-email" type="email" required></div>
-            <div class="form-field"><label class="field-label" for="smtp-username">Gmail account</label><input class="input" id="smtp-username" type="email" required></div>
+            <div class="form-field"><label class="field-label" for="smtp-username">SMTP username</label><input class="input" id="smtp-username" type="email" required></div>
             <div class="form-field"><label class="field-label" for="smtp-from">From address</label><input class="input" id="smtp-from" type="email" required></div>
             <div class="form-field"><label class="field-label" for="sender-name">Sender name</label><input class="input" id="sender-name" required></div>
             <div class="form-field"><label class="field-label" for="subject-prefix">Subject prefix</label><input class="input" id="subject-prefix" required></div>
@@ -241,11 +241,11 @@ export function renderControlPage(baseUrl) {
           </div>
         </section>
         <section class="settings-group">
-          <div class="settings-heading"><h2>SMTP</h2><p>Gmail transport</p></div>
+          <div class="settings-heading"><h2>SMTP</h2><p>Mail transport</p></div>
           <div class="form-grid">
             <div class="form-field"><label class="field-label" for="smtp-host">Host</label><input class="input" id="smtp-host" required></div>
             <div class="form-field"><label class="field-label" for="smtp-port">Port</label><input class="input" id="smtp-port" type="number" min="1" max="65535" required></div>
-            <div class="form-field full"><label class="field-label" for="smtp-password">App password <span id="secret-state" class="secret-state"></span></label><input class="input" id="smtp-password" type="password" autocomplete="new-password" placeholder="Leave blank to keep current password"></div>
+            <div class="form-field full"><label class="field-label" for="smtp-password">SMTP password <span id="secret-state" class="secret-state"></span></label><input class="input" id="smtp-password" type="password" autocomplete="new-password" placeholder="Leave blank to keep current password"></div>
             <div class="form-field full"><div class="toolbar-group"><label class="check"><input id="smtp-secure" type="checkbox">Implicit TLS</label><label class="check"><input id="smtp-require-tls" type="checkbox">Require STARTTLS</label></div></div>
           </div>
         </section>

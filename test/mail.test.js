@@ -6,7 +6,7 @@ const config = {
   rngdle: { baseUrl: "https://www.rngdle.com" },
   control: { publicUrl: "http://localhost:3000" },
   mail: { fromName: "RNGdle Today", subjectPrefix: "[RNGdle]" },
-  smtp: { from: "sender@gmail.com", to: ["receiver@example.com"] },
+  smtp: { from: "sender@example.com", to: ["receiver@example.com"] },
 };
 
 test("buildRollMessage renders the RNGdle result hierarchy", () => {
@@ -18,7 +18,7 @@ test("buildRollMessage renders the RNGdle result hierarchy", () => {
   });
 
   assert.match(message.subject, /534461 \(\+2795 EP\)/);
-  assert.deepEqual(message.from, { name: "RNGdle Today", address: "sender@gmail.com" });
+  assert.deepEqual(message.from, { name: "RNGdle Today", address: "sender@example.com" });
   assert.match(message.text, /Total EP: 865,460/);
   assert.match(message.html, />534461</);
   assert.match(message.html, /2,795 EP/);
@@ -44,5 +44,5 @@ test("mail templates escape untrusted display values", () => {
   assert.match(message.html, /&lt;img src=x/);
   assert.doesNotMatch(authentication.html, /<script>alert/);
   assert.match(authentication.html, /&lt;script&gt;/);
-  assert.deepEqual(authentication.from, { name: "RNGdle Today", address: "sender@gmail.com" });
+  assert.deepEqual(authentication.from, { name: "RNGdle Today", address: "sender@example.com" });
 });
