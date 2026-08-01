@@ -31,7 +31,8 @@ async function runAutomation(config, control) {
     log("info", "RNGdle service started", {
     timezone: config.timezone,
     time: config.schedule.time,
-    retryMinutes: config.schedule.retryMinutes,
+    rngdleRetryMinutes: config.schedule.retryMinutes,
+    emailRetryMinutes: config.schedule.emailRetryMinutes,
   });
 
   while (!stopping) {

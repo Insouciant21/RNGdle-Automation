@@ -1,380 +1,145 @@
 # RNGdle Automation
 
-> Self-hosted RNGdle automation with persistent login, retry-safe scheduling, SMTP reports, and a local control dashboard.
-
-每天在 UTC+8 `08:02` 自动完成 [RNGdle](https://www.rngdle.com) roll，读取当天数字、获得 EP、Lifetime EP 与 badges，并通过 SMTP 发送结果邮件。项目使用持久化浏览器会话、幂等状态记录和 Docker Compose 常驻运行。
-
-[快速开始](#快速开始) · [配置参考](#配置参考) · [Control 页面](#control-页面) · [重试与幂等](#重试与幂等) · [运维](#常用运维) · [安全](#安全)
+一个自托管的 RNGdle 每日自动化服务：在 UTC+8 `08:02` 执行当天 roll，读取数字、EP、Lifetime EP 和 badges，并通过通用 SMTP 发送结果邮件。
 
 ![RNGdle Control](docs/control-page.png)
 
-## 核心能力
+## 功能
 
-| 能力 | 实现 |
-| --- | --- |
-| 自动调度 | 默认每天 `08:02 Asia/Shanghai` 执行，失败后每 30 分钟重试 |
-| 持久登录 | RNGdle 服务启动时检查 Playwright persistent context；失效后通过 Control 页面交互认证 |
-| 幂等执行 | 已有 roll 直接复用；邮件失败只重试投递，不会再次生成数字 |
-| 邮件报告 | SMTP 同时发送 RNGdle 风格 HTML 与纯文本结果 |
-| Control | 提供状态、结构化日志、邮件预览、认证入口和运行时设置 |
-| 容器部署 | Compose 管理 rngdle 服务、数据卷和健康检查，无需 VNC |
-
-Control 自托管 Inter 与 Space Mono 字体。运行状态保存在 `state.json`，默认只保留最近 45 天；网页修改的配置会立即生效并持久化到数据卷。
-
-## 工作流程
-
-```text
-08:02 UTC+8
-    |
-    v
-启动 RNGdle 服务 ---- 会话失效 ----> Control 页面等待认证
-    |
-    v
-读取 state.json ---- 今日已成功 ----> 跳过
-    |
-    v
-检查 /api/home ---- 登录失效 ----> 邮件提醒 + Control 页面等待认证
-    |
-    v
-已有今日结果? ---- 是 ----> 复用结果
-    | 否
-    v
-点击 GENERATE
-    |
-    v
-保存结果 ----> SMTP 发送 ----> 标记 success
-```
-
-RNGdle 当前使用 email magic link 和 Cloudflare Turnstile，而不是数字验证码。Turnstile 在宿主机浏览器完成，magic link 由容器内的 headless Chromium 打开并保存会话。
-
-## 运行模式
-
-| 模式 | 用途 | 启动方式 |
-| --- | --- | --- |
-| `rngdle` | 常驻调度、认证和自动重试 | `docker compose up -d rngdle` |
-| `once` | 立即检查一次，仍遵守每日幂等状态 | `docker compose --profile tools run --rm --service-ports once` |
-
-## 环境要求
-
-推荐运行方式：
-
-- Docker Engine
-- Docker Compose v2
-- 可访问 `www.rngdle.com` 和配置的 SMTP 服务器
-
-本地开发还需要：
-
-- Node.js 22 或更高版本
-- pnpm 11.17.0
+- Docker Compose 常驻运行，默认时区为 `Asia/Shanghai`
+- Playwright 持久化登录，会话失效时通过 Control 页面重新认证
+- 当天任务幂等执行，失败后按配置间隔重试，默认每 30 分钟一次
+- RNGdle 风格 HTML 邮件和纯文本邮件
+- 本地 Control 页面：Overview、Logs、Authentication、Settings
+- 数据、浏览器会话和运行日志保存于 Docker named volume
 
 ## 快速开始
 
-### 1. 创建配置
+### 1. 配置
 
 ```bash
-install -m 600 .env.example .env
+cp .env.example .env
 cp config/config.example.yaml config/config.yaml
-chmod 600 config/config.yaml
 ```
 
-至少填写：
-
-```dotenv
-RNGDLE_EMAIL=your-rngdle-account@example.com
-
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=your-smtp-user@example.com
-SMTP_PASSWORD=your-smtp-password
-MAIL_TO=receiver@example.com
-```
-
-`RNGDLE_EMAIL` 与 SMTP 发件账号可以不同。`SMTP_PASSWORD` 应填写 SMTP 服务商要求的密码、应用密码或令牌；现有配置中的 `SMTP_APP_PASSWORD` 仍作为兼容别名读取。
-
-### 2. 配置 SMTP
-
-1. 填写 SMTP 主机、端口、TLS 选项和认证方式。
-2. 按服务商要求填写 SMTP 用户名和密码、应用密码或令牌。
-3. 如果使用 OAuth2，同时填写 `SMTP_OAUTH_*` 配置，并提供服务商的 token endpoint。
-
-### 3. 启动 RNGdle 服务并完成首次认证
-
-```bash
-docker compose up -d rngdle
-docker compose ps rngdle
-```
-
-打开 [http://localhost:3000](http://localhost:3000)：
-
-1. 点击 `REQUEST SIGN-IN LINK` 打开 RNGdle。
-2. 输入 `RNGDLE_EMAIL`，完成 Turnstile 并请求登录邮件。
-3. 不要在普通浏览器中消费 magic link；复制完整的 `https://...rngdle.com/...` 地址。
-4. 将地址粘贴到 Control 页面并提交。
-5. 页面显示 `Authenticated` 后，RNGdle 服务会继续运行并等待每日任务。
-
-magic link 只允许 HTTPS 的 `rngdle.com` 域名。浏览器 profile 保存在 Docker volume，后续启动会直接复用。
-
-> [!NOTE]
-> RNGdle 强制使用绑定官网域名的 Cloudflare Turnstile。Control 无法直接请求登录邮件，因此 `REQUEST SIGN-IN LINK` 必须打开官网完成验证；这一步不能由容器安全绕过。
-
-RNGdle 服务后续会在每天 `08:02 Asia/Shanghai` 自动执行；日志可通过以下命令查看：
-
-```bash
-docker compose logs -f rngdle
-```
-
-Control 页面位于 [http://localhost:3000](http://localhost:3000)。健康状态应为 `healthy`。
-
-## 配置参考
-
-Docker Compose 从 `.env` 注入启动配置，[config/config.example.yaml](config/config.example.yaml) 展示结构化映射和校验规则。
+在 `.env` 中填写 RNGdle 邮箱和 SMTP 凭证。常用配置如下：
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `TZ` | `Asia/Shanghai` | 调度所用 IANA 时区 |
-| `SCHEDULE_TIME` | `08:02` | 每日执行时间，24 小时制 `HH:mm` |
-| `RETRY_MINUTES` | `30` | 当天未成功时的重试间隔 |
-| `POLL_SECONDS` | `30` | 调度状态轮询间隔 |
+| `TZ` | `Asia/Shanghai` | 调度时区 |
+| `SCHEDULE_TIME` | `08:02` | 每日执行时间 |
+| `RETRY_MINUTES` | `30` | RNGdle roll 失败重试间隔 |
+| `EMAIL_RETRY_MINUTES` | `1` | 邮件发送失败重试间隔（兼容旧变量 `MAIL_RETRY_MINUTES`） |
 | `RNGDLE_EMAIL` | 必填 | RNGdle 登录邮箱 |
-| `RNGDLE_BASE_URL` | `https://www.rngdle.com` | RNGdle 地址 |
-| `SMTP_HOST` | `smtp.example.com` | SMTP 服务器 |
-| `SMTP_PORT` | `587` | STARTTLS 端口 |
-| `SMTP_SECURE` | `false` | `587` 使用 STARTTLS，因此为 `false` |
-| `SMTP_REQUIRE_TLS` | `true` | 强制升级 TLS |
+| `SMTP_HOST` | - | SMTP 主机 |
+| `SMTP_PORT` | `587` | SMTP 端口 |
+| `SMTP_SECURE` | `false` | `true` 表示 implicit TLS（通常为 465） |
+| `SMTP_REQUIRE_TLS` | `true` | 是否要求 STARTTLS |
 | `SMTP_AUTH_MODE` | `password` | `password` 或 `oauth2` |
-| `SMTP_USER` | 必填 | SMTP 登录用户名 |
-| `SMTP_PASSWORD` | 必填 | SMTP 密码、应用密码或令牌；兼容旧变量 `SMTP_APP_PASSWORD` |
-| `SMTP_OAUTH_ACCESS_URL` | 空 | OAuth2 token endpoint |
-| `MAIL_FROM` | `SMTP_USER` | 邮件 From；留空时使用 SMTP 用户 |
-| `MAIL_FROM_NAME` | `RNGdle Today` | 收件箱中显示的发件人昵称 |
-| `MAIL_TO` | 必填 | 一个或多个收件人，逗号分隔 |
-| `MAIL_SUBJECT_PREFIX` | `[RNGdle]` | 邮件标题前缀 |
-| `CONTROL_PORT` | `3000` | 容器内 Control 端口 |
-| `CONTROL_PUBLIC_URL` | `http://localhost:3000` | 登录失效邮件中的 Control 地址 |
-| `BROWSER_HEADLESS` | `true` | 自动任务是否使用 headless Chromium |
-| `BROWSER_TIMEOUT_MS` | `45000` | 页面及 API 操作超时 |
+| `SMTP_USER` | - | SMTP 用户名 |
+| `SMTP_PASSWORD` | - | SMTP 密码或应用专用密码 |
+| `MAIL_FROM` | - | 发件地址 |
+| `MAIL_TO` | - | 收件地址 |
+| `MAIL_FROM_NAME` | `RNGdle Today` | 发件人显示名称 |
 
-`${VARIABLE}` 缺失时程序会拒绝启动；`${VARIABLE:-default}` 会使用默认值。`.env` 与实际 `config/config.yaml` 已在 `.gitignore` 和 `.dockerignore` 中排除。
+OAuth2 还需要 `SMTP_OAUTH_CLIENT_ID`、`SMTP_OAUTH_CLIENT_SECRET`、`SMTP_OAUTH_REFRESH_TOKEN` 和 `SMTP_OAUTH_ACCESS_URL`。完整配置见 [`config/config.example.yaml`](config/config.example.yaml)。
 
-Control 的 Settings 页面会将修改写入 `/app/data/settings.json`，其优先级高于 `.env`/YAML，并在当前进程立即生效。容器重启后会再次加载这些覆盖值。由于 `.env` 是启动安全基线，其中的必填变量仍然必须有效。
+### 2. 启动
 
-以下配置仍只通过文件或 Docker 环境变量管理：`RNGDLE_BASE_URL`、`SMTP_AUTH_MODE`、`CONTROL_PORT`、`BROWSER_HEADLESS` 和数据目录。
+```bash
+docker compose up -d rngdle
+docker compose logs -f rngdle
+```
+
+打开 [http://localhost:3000](http://localhost:3000)。Control 默认只绑定本机地址。
+
+### 3. 首次登录
+
+1. 在 Overview 或 Authentication 页面点击 **Request sign-in link**，进入官方 RNGdle 登录页。
+2. 完成邮箱填写和 Cloudflare Turnstile，接收 RNGdle 发来的 magic link。
+3. 将完整的 `https://www.rngdle.com/...` 链接粘贴到 Authentication 页面并提交。
+4. 等待状态变为 **Authenticated**，服务会保存 Playwright 浏览器会话。
+
+验证码和 Turnstile 由官方页面处理；Control 不会代发绕过验证的登录请求。登录失效时，服务会在页面和邮件中提示重新认证。
+
+![Authentication](docs/control-auth.png)
 
 ## Control 页面
 
-Control 将品牌、四视图导航和 RNGdle 服务状态集中在页面 header 中。移动端导航保留在 header 第二行，四个入口等宽排列。
+- **Overview**：查看服务状态、最近一次结果和下次调度；右侧可直接 **Send email** 或 **Open preview**。
+- **Logs**：查看结构化运行日志和筛选结果。
+- **Authentication**：输入 magic link、查看认证状态和会话时间。
+- **Settings**：分别修改 RNGdle roll 重试、邮件重试、调度和 SMTP 配置。保存后写入数据卷并立即作为运行时覆盖；空白 SMTP 密码会保留当前密码。
 
-页面主区域和 Logs 面板使用本地打包的 `perfect-scrollbar`，内容刷新、视图切换和窗口缩放后会自动同步滚动范围；脚本不可用时回退到原生滚动。Overview 右侧的 `Open preview` 会在新窗口打开 600px 邮件内容，和实际 SMTP 投递使用完全相同的 `buildRollMessage()` HTML。
+邮件预览使用与实际发送相同的数据和模板：
 
-四个视图分别提供：
+![Email result](docs/email-result.png)
 
-| 视图 | 功能 |
-| --- | --- |
-| `Overview` | RNGdle 服务状态、rarity 数字框、badge breakdown、EP、邮件状态、重试信息和 RNGdle 认证 |
-| `Logs` | 当前进程最近 250 条结构化日志、级别筛选、手动与自动刷新 |
-| `Authentication` | 请求 magic link 并提交 URL，管理持久化 RNGdle 会话 |
-| `Settings` | 热更新调度、浏览器超时、账号、收件人、主题和 SMTP 参数 |
+邮件会显示当天数字、稀有度、EP、Lifetime EP 和 badges。稀有度阈值遵循 RNGdle：Common、Uncommon、Rare、Epic、Anomaly、Mythic。
 
-![RNGdle Control logs](docs/control-logs.png)
+## 调度与重试
 
-![RNGdle Control authentication](docs/control-auth.png)
+服务启动后会检查当天本地状态：
 
-![RNGdle Control settings](docs/control-settings.png)
+1. 当天已经成功 roll 且邮件已发送，直接跳过。
+2. 已有当天 roll 会直接复用，不会重新生成数字。
+3. RNGdle roll 未完成或失败，按 `RETRY_MINUTES` 重试；默认每 30 分钟一次。
+4. 邮件发送失败只重试投递，按 `EMAIL_RETRY_MINUTES` 重试；默认每 1 分钟一次。
+5. 浏览器会话失效时暂停任务，完成 Authentication 后自动恢复。
 
-顶部状态区域展示三个主要认证状态：
-
-| 状态 | 含义 |
-| --- | --- |
-| `idle` | RNGdle 服务正常运行，没有等待人工操作 |
-| `waiting` | RNGdle 登录失效，等待提交 magic link |
-| `authenticated` | 新会话已确认，待执行任务将继续 |
-
-Settings 中的 SMTP password 输入始终为空，只显示 `(configured)` 或 `(missing)`。留空保存会保留现有密码；输入新值才会替换。设置文件使用 `0600` 权限原子写入。
-
-Logs 只保留当前 rngdle 进程最近 250 条记录，容器重启后清空；需要长期历史时使用 `docker compose logs` 或配置 Docker 日志驱动。Overview 右侧的邮件操作会在发送前确认收件人；手动发送会写入日志，但不会改变每日任务状态。
-
-Control 页面使用的本地 API：
-
-| 方法与路径 | 用途 |
-| --- | --- |
-| `GET /api/overview` | RNGdle 服务、最近任务和结果摘要 |
-| `GET /api/logs` | 结构化日志；支持 `level`、`limit` 与 `after` 参数 |
-| `GET /api/settings` | 返回可编辑配置，不包含 SMTP 密码 |
-| `PUT /api/settings` | 校验、持久化并立即应用配置 |
-| `GET /preview/email` | 渲染每日结果邮件预览；认证邮件模板仅由后台失效流程使用 |
-| `POST /api/email/send` | 手动发送当前结果或登录失效邮件 |
-| `POST /api/auth-link` | 在等待认证时提交 RNGdle magic link |
-
-页面默认只通过 Compose 绑定到 `127.0.0.1:3000`。远程主机应使用 SSH 隧道：
-
-```bash
-ssh -L 3000:127.0.0.1:3000 user@server
-```
-
-不要直接将 Control 页面暴露到公网；它会接收具有登录能力的 magic link。
-
-## 结果邮件
-
-HTML 邮件使用适合 Gmail、Outlook 等客户端的现代系统字体栈（Inter、Segoe UI、system-ui、Arial），数字区域使用 `tabular-nums` 保持对齐，不依赖 Courier New 或客户端安装 Space Mono：
-
-- 居中的当天数字框
-- 根据整体分位数着色的 Trash、Common、Uncommon、Rare、Epic、Anomaly 或 Mythic 数字框
-- 当次 EP 胶囊
-- Lifetime EP
-- Badge breakdown、每个 badge 的 rarity 框、描述、NEW 标记和 EP
-- RNGdle 跳转按钮
-
-badge rarity 使用 [RNGdle 官方 rarity 规则](https://www.rngdle.com/about) 的 EP 阈值：`<1,000` Common、`<10,000` Uncommon、`<100,000` Rare、`<1,000,000` Epic、`<10,000,000` Anomaly，以上为 Mythic。邮件 CSS 全部内联，Gmail、Outlook 等客户端即使不加载项目字体也会回退到兼容的系统字体。
-
-![RNGdle result email](docs/email-result.png)
-
-同时发送纯文本版本，禁用 HTML 的邮件客户端仍可读取完整结果。登录失效提醒使用相同模板，并链接到 `CONTROL_PUBLIC_URL`。
-
-## 重试与幂等
-
-每日状态可能为：
-
-- `running`：正在处理。
-- `failed`：尚未得到 roll，等待重试。
-- `email_pending`：roll 已保存，仅需重试邮件。
-- `success`：roll 与邮件均完成，当天不再执行。
-
-在发送邮件前，roll 结果会先原子写入 `state.json`。因此 SMTP 故障不会导致再次点击 `GENERATE`。进程锁带心跳机制，用于防止 rngdle 服务和手动任务同时操作同一个浏览器 profile。
-
-## 手动执行
-
-`once` 会立即检查当天任务，但仍遵守当天 `success` 状态。由于 rngdle 服务和 once 共用端口及浏览器 profile，应先停止 rngdle 服务：
+需要手动立即执行时，先停止常驻服务，再使用 `once` profile（两者共享端口和浏览器数据）：
 
 ```bash
 docker compose stop rngdle
 docker compose --profile tools run --rm --service-ports once
-docker compose up -d rngdle
+docker compose start rngdle
 ```
-
-## 数据与备份
-
-持久数据位于 `rngdle-data` volume：
-
-```text
-/app/data/
-├── browser-profile/   # Chromium cookies 和站点存储
-├── state.json         # 每日结果、邮件与重试状态
-├── settings.json      # Control 保存的运行时配置与 SMTP 密码
-└── workflow.lock      # 运行时互斥锁
-```
-
-查看 volume：
-
-```bash
-docker volume inspect rngdle_automation_rngdle-data
-```
-
-备份：
-
-```bash
-docker run --rm \
-  -v rngdle_automation_rngdle-data:/data:ro \
-  -v "$PWD":/backup \
-  alpine tar czf /backup/rngdle-data.tar.gz -C /data .
-```
-
-备份中包含有效登录 cookies 和 SMTP 应用专用密码，应按照密码材料保护。
 
 ## 常用运维
 
 ```bash
-# 状态
 docker compose ps
-
-# 实时日志
 docker compose logs -f rngdle
-
-# 重启
 docker compose restart rngdle
-
-# 停止
 docker compose down
-
-# 更新并重建
-docker compose build --pull rngdle
-docker compose up -d --force-recreate rngdle
 ```
 
-`docker compose down` 不会删除 named volume。不要使用 `docker compose down -v`，除非确定要清除登录状态和历史记录。
-
-## 排障
-
-### Control 页面打不开
+`docker compose down` 不会删除 named volume。以下命令会同时删除登录会话、历史状态和设置，请谨慎使用：
 
 ```bash
-docker compose ps rngdle
-curl -i http://localhost:3000/api/status
+docker compose down -v
 ```
 
-确认端口显示为 `127.0.0.1:3000->3000/tcp`。若端口被占用，停止占用程序或修改 Compose 的宿主机端口。
+主要数据位于 `rngdle_automation_rngdle-data`：
 
-### RNGdle DNS 或网络错误
+- `browser-profile/`：Playwright persistent context 和 cookies
+- `state.json`：每日结果、邮件状态和重试记录
+- `settings.json`：Control 页面保存的运行时配置
+- `workflow.lock`：任务互斥锁
 
-```bash
-docker compose exec rngdle getent hosts www.rngdle.com
-```
-
-临时 DNS 故障会写入当天状态，并按照 `RETRY_MINUTES` 自动重试。
-
-### SMTP 返回认证错误
-
-- 确认 `SMTP_HOST`、`SMTP_PORT` 和 TLS 选项符合服务商要求。
-- 确认 `SMTP_USER` 和 `SMTP_PASSWORD` 使用服务商要求的认证信息。
-- OAuth2 模式下确认 `SMTP_OAUTH_ACCESS_URL` 和令牌配置正确。
-
-### 登录失效
-
-打开 Control 页面重新请求并提交 magic link。认证成功后，正在等待的当天任务会自动继续，不需要重启容器。
-
-## 安全
-
-- Control 端口默认仅绑定 localhost。
-- `MAIL_TO` 没有公开默认地址，必须由部署者显式配置。
-- `.env`、实际配置、浏览器 profile 和状态文件不会进入 Docker build context。
-- 外部网络错误只记录首行摘要，避免 Playwright 请求头和 cookies 进入日志。
-- 日志 API 对 password、secret、token、cookie 和 authorization 字段自动脱敏。
-- Settings API 不返回 SMTP 密码，并拒绝跨域写请求。
-- 邮件预览 iframe 使用 CSP 禁止脚本、表单和外部连接。
-- magic link 提交接口限制请求体大小，并只接受 RNGdle HTTPS 域名。
-- 建议定期轮换 SMTP 密码或令牌，并限制 `.env` 和备份文件的访问权限。
+备份该 volume 前请确认其中包含登录 cookies 和 SMTP 密钥。Control 默认只监听 `127.0.0.1`，不要直接暴露到公网；远程访问请使用 SSH tunnel 或私有 HTTPS 入口。
 
 ## 本地开发
+
+需要 Node.js 20+ 和 pnpm：
 
 ```bash
 corepack enable
 pnpm install
-install -m 600 .env.example .env
-cp config/config.example.yaml config/config.yaml
 pnpm test
-pnpm once
 pnpm start
 ```
 
-测试覆盖配置展开、运行时设置持久化、密码保护、Control API、同源写入、邮件预览 CSP、SMTP 默认值、时区调度、重试条件、RNGdle API 结果标准化、magic link 域名限制、日志脱敏和邮件模板转义。
+本地启动同样使用 `config/config.yaml` 和 `.env`。生产环境建议使用 Docker Compose，以确保浏览器依赖和持久化卷一致。
 
 ## 项目结构
 
 ```text
-src/
-├── config.js       # YAML、环境变量和严格校验
-├── control.js      # Control HTTP/API 服务
-├── control-page.js # 四视图 Control 前端
-├── index.js        # rngdle/once 入口
-├── logger.js       # 结构化日志和内存缓冲
-├── mail.js         # SMTP transport 与邮件模板
-├── rngdle.js       # Playwright 登录、API 检查和 roll
-├── schedule.js     # UTC+8 调度判断
-├── settings.js     # 运行时设置校验、持久化和热应用
-├── state.js        # 原子状态文件和进程锁
-└── workflow.js     # roll、邮件、重试与登录恢复编排
-
-config/             # 配置模板与本机实际配置
-test/               # Node.js 单元测试
-compose.yaml        # rngdle、once 服务
-Dockerfile          # Playwright + pnpm 生产镜像
+src/index.js          调度器和 CLI 入口
+src/rngdle.js         登录、roll、结果解析
+src/mail.js           SMTP 发送和邮件模板
+src/control-server.js Control API 和静态页面
+src/control-page.js   Control UI
+config/               配置模板
+docs/                 README 截图
 ```

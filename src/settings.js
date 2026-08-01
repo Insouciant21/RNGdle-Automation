@@ -68,7 +68,8 @@ export function publicSettings(config) {
   return {
     timezone: config.timezone,
     scheduleTime: config.schedule.time,
-    retryMinutes: config.schedule.retryMinutes,
+    rngdleRetryMinutes: config.schedule.retryMinutes,
+    emailRetryMinutes: config.schedule.emailRetryMinutes ?? 1,
     pollSeconds: config.schedule.pollSeconds,
     rngdleEmail: config.rngdle.email,
     browserTimeoutMs: config.browser.timeoutMs,
@@ -93,7 +94,18 @@ export function validateSettings(input, config) {
   return {
     timezone: timezoneValue(input.timezone ?? config.timezone),
     scheduleTime: timeValue(input.scheduleTime ?? config.schedule.time),
-    retryMinutes: integerValue(input.retryMinutes ?? config.schedule.retryMinutes, "retryMinutes", 1, 1_440),
+    rngdleRetryMinutes: integerValue(
+      input.rngdleRetryMinutes ?? input.retryMinutes ?? config.schedule.retryMinutes,
+      "rngdleRetryMinutes",
+      1,
+      1_440,
+    ),
+    emailRetryMinutes: integerValue(
+      input.emailRetryMinutes ?? config.schedule.emailRetryMinutes ?? 1,
+      "emailRetryMinutes",
+      1,
+      1_440,
+    ),
     pollSeconds: integerValue(input.pollSeconds ?? config.schedule.pollSeconds, "pollSeconds", 5, 3_600),
     rngdleEmail: emailValue(input.rngdleEmail ?? config.rngdle.email, "rngdleEmail"),
     browserTimeoutMs: integerValue(
@@ -127,7 +139,8 @@ export function validateSettings(input, config) {
 export function applySettings(config, settings) {
   config.timezone = settings.timezone;
   config.schedule.time = settings.scheduleTime;
-  config.schedule.retryMinutes = settings.retryMinutes;
+  config.schedule.retryMinutes = settings.rngdleRetryMinutes;
+  config.schedule.emailRetryMinutes = settings.emailRetryMinutes;
   config.schedule.pollSeconds = settings.pollSeconds;
   config.rngdle.email = settings.rngdleEmail;
   config.browser.timeoutMs = settings.browserTimeoutMs;

@@ -33,15 +33,30 @@ export async function runDailyWorkflow(config, date, now = new Date(), control =
 
   try {
     const state = await readState(config.storage.statePath);
-    const current = state.days[date] ?? { status: "pending", attempts: 0 };
+    const current = state.days[date] ?? { status: "pending", attempts: 0, emailAttempts: 0 };
     if (current.status === "success") {
       return { skipped: true, result: current.result };
     }
 
-    current.status = "running";
-    current.attempts += 1;
+    const hasResult = Boolean(current.result);
+    let emailAttemptStarted = false;
+    current.status = hasResult ? "email_pending" : "running";
+    current.attempts = current.attempts ?? 0;
+    current.emailAttempts = current.emailAttempts ?? 0;
     current.lastAttemptAt = now.toISOString();
-    current.nextRetryAt = nextRetryAt(now, config.schedule.retryMinutes);
+    if (!hasResult) {
+      current.attempts += 1;
+      current.lastRngdleAttemptAt = now.toISOString();
+      current.nextRngdleRetryAt = nextRetryAt(now, config.schedule.retryMinutes);
+      current.nextEmailRetryAt = null;
+    } else if (!current.emailSentAt) {
+      current.emailAttempts += 1;
+      current.lastEmailAttemptAt = now.toISOString();
+      current.nextEmailRetryAt = nextRetryAt(now, config.schedule.emailRetryMinutes ?? 1);
+      current.nextRngdleRetryAt = null;
+      emailAttemptStarted = true;
+    }
+    current.nextRetryAt = hasResult ? current.nextEmailRetryAt : current.nextRngdleRetryAt;
     current.lastError = null;
     state.days[date] = current;
     pruneState(state);
@@ -52,16 +67,26 @@ export async function runDailyWorkflow(config, date, now = new Date(), control =
         current.result = await obtainRoll(config, control);
         current.rolledAt = new Date().toISOString();
         current.status = "email_pending";
+        current.nextRngdleRetryAt = null;
+        current.nextRetryAt = null;
         await writeState(config.storage.statePath, state);
       }
 
       if (!current.emailSentAt) {
+        if (!emailAttemptStarted) {
+          current.emailAttempts += 1;
+          current.lastEmailAttemptAt = now.toISOString();
+          current.nextEmailRetryAt = nextRetryAt(now, config.schedule.emailRetryMinutes ?? 1);
+        }
+        await writeState(config.storage.statePath, state);
         const info = await sendRollEmail(config, date, current.result);
         current.emailSentAt = new Date().toISOString();
         current.emailMessageId = info.messageId;
       }
       current.status = "success";
       current.completedAt = new Date().toISOString();
+      current.nextRngdleRetryAt = null;
+      current.nextEmailRetryAt = null;
       current.nextRetryAt = null;
       await writeState(config.storage.statePath, state);
       log("info", "Daily RNGdle workflow completed", {
@@ -72,12 +97,20 @@ export async function runDailyWorkflow(config, date, now = new Date(), control =
       });
       return { skipped: false, result: current.result };
     } catch (error) {
-      current.status = current.result ? "email_pending" : "failed";
+      const emailPending = Boolean(current.result) && !current.emailSentAt;
+      current.status = emailPending ? "email_pending" : "failed";
+      current.nextRngdleRetryAt = emailPending ? null : nextRetryAt(now, config.schedule.retryMinutes);
+      current.nextEmailRetryAt = emailPending
+        ? nextRetryAt(now, config.schedule.emailRetryMinutes ?? 1)
+        : null;
+      current.nextRetryAt = emailPending ? current.nextEmailRetryAt : current.nextRngdleRetryAt;
       current.lastError = errorSummary(error);
       await writeState(config.storage.statePath, state);
       log("error", "Daily RNGdle workflow failed", {
         date,
-        attempt: current.attempts,
+        rngdleAttempt: current.attempts,
+        emailAttempt: current.emailAttempts,
+        retryType: emailPending ? "email" : "rngdle",
         retryAt: current.nextRetryAt,
         error: current.lastError,
       });

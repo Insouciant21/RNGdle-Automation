@@ -122,6 +122,10 @@ async function overviewPayload(config, status) {
   const state = await readState(config.storage.statePath);
   const latest = newestDay(state);
   const latestResult = newestDay(state, (day) => Boolean(day.result));
+  const splitRetryState = latest
+    ? Object.hasOwn(latest.day, "nextRngdleRetryAt") || Object.hasOwn(latest.day, "nextEmailRetryAt")
+    : false;
+  const legacyRetryAt = splitRetryState ? null : latest?.day.nextRetryAt ?? null;
   return {
     status,
     generatedAt: new Date().toISOString(),
@@ -129,6 +133,8 @@ async function overviewPayload(config, status) {
       timezone: config.timezone,
       time: config.schedule.time,
       retryMinutes: config.schedule.retryMinutes,
+      rngdleRetryMinutes: config.schedule.retryMinutes,
+      emailRetryMinutes: config.schedule.emailRetryMinutes ?? 1,
     },
     rngdle: { email: config.rngdle.email, baseUrl: config.rngdle.baseUrl },
     mail: { from: config.smtp.from, to: [...config.smtp.to] },
@@ -137,7 +143,18 @@ async function overviewPayload(config, status) {
           date: latest.date,
           status: latest.day.status,
           attempts: latest.day.attempts ?? 0,
-          nextRetryAt: latest.day.nextRetryAt ?? null,
+          emailAttempts: latest.day.emailAttempts ?? 0,
+          nextRngdleRetryAt: splitRetryState ? latest.day.nextRngdleRetryAt ?? null : legacyRetryAt,
+          nextEmailRetryAt: splitRetryState
+            ? latest.day.nextEmailRetryAt ?? null
+            : latest.day.status === "email_pending"
+              ? legacyRetryAt
+              : null,
+          nextRetryAt: splitRetryState
+            ? latest.day.status === "email_pending"
+              ? latest.day.nextEmailRetryAt ?? null
+              : latest.day.nextRngdleRetryAt ?? null
+            : legacyRetryAt,
           lastError: latest.day.lastError ?? null,
           emailSent: Boolean(latest.day.emailSentAt),
         }

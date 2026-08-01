@@ -38,6 +38,38 @@ test("successful days do not rerun and failed days respect next retry", () => {
   );
 });
 
+test("email-pending days use the email retry timestamp", () => {
+  const base = {
+    timezone: "Asia/Shanghai",
+    scheduleTime: "08:02",
+    now: new Date("2026-07-29T01:00:00Z"),
+  };
+  assert.equal(
+    isWorkflowDue({
+      ...base,
+      dayState: {
+        status: "email_pending",
+        lastAttemptAt: "2026-07-29T00:45:00Z",
+        nextRngdleRetryAt: "2026-07-29T01:45:00Z",
+        nextEmailRetryAt: "2026-07-29T00:46:00Z",
+      },
+    }),
+    true,
+  );
+  assert.equal(
+    isWorkflowDue({
+      ...base,
+      dayState: {
+        status: "email_pending",
+        lastAttemptAt: "2026-07-29T00:45:00Z",
+        nextRngdleRetryAt: "2026-07-29T01:45:00Z",
+        nextEmailRetryAt: "2026-07-29T01:01:00Z",
+      },
+    }),
+    false,
+  );
+});
+
 test("nextRetryAt adds the configured interval", () => {
   assert.equal(nextRetryAt(new Date("2026-07-29T00:02:00Z"), 30), "2026-07-29T00:32:00.000Z");
 });

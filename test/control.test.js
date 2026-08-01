@@ -71,6 +71,8 @@ test("control APIs expose operations without exposing secrets", async (context) 
   assert.match(page, /\/assets\/fonts\/inter-latin\.woff2/);
   assert.match(page, /id="email-send"/);
   assert.match(page, /Send email/);
+  assert.match(page, /RNGdle retry minutes/);
+  assert.match(page, /Email retry minutes/);
   assert.doesNotMatch(page, /Login required/);
   assert.doesNotMatch(page, /data-email-type="authentication"/);
   assert.match(page, /data-view="auth"/);
@@ -105,6 +107,8 @@ test("control APIs expose operations without exposing secrets", async (context) 
   const settings = await (await fetch(`${baseUrl}/api/settings`)).json();
   assert.equal(settings.hasSmtpPassword, true);
   assert.equal(settings.mailFromName, "RNGdle Today");
+  assert.equal(settings.rngdleRetryMinutes, 30);
+  assert.equal(settings.emailRetryMinutes, 1);
   assert.equal("smtpAppPassword" in settings, false);
   assert.doesNotMatch(JSON.stringify(settings), /never-return-this/);
 

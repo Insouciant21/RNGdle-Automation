@@ -71,7 +71,11 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
     throw error;
   }
 
-  const expandedEnv = { ...env, SMTP_PASSWORD: env.SMTP_PASSWORD || env.SMTP_APP_PASSWORD || "" };
+  const expandedEnv = {
+    ...env,
+    SMTP_PASSWORD: env.SMTP_PASSWORD || env.SMTP_APP_PASSWORD || "",
+    EMAIL_RETRY_MINUTES: env.EMAIL_RETRY_MINUTES || env.MAIL_RETRY_MINUTES || "",
+  };
   const raw = expandEnvironment(YAML.parse(source), expandedEnv);
   const configuredRecipients = raw.smtp?.to;
   const recipients = Array.isArray(configuredRecipients)
@@ -109,6 +113,7 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
     schedule: {
       time: validateTime(raw.schedule?.time ?? "08:02"),
       retryMinutes: positiveInteger(raw.schedule?.retryMinutes ?? 30, "schedule.retryMinutes"),
+      emailRetryMinutes: positiveInteger(raw.schedule?.emailRetryMinutes ?? 1, "schedule.emailRetryMinutes"),
       pollSeconds: positiveInteger(raw.schedule?.pollSeconds ?? 30, "schedule.pollSeconds"),
     },
     rngdle: {

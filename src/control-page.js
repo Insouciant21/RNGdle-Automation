@@ -185,8 +185,10 @@ export function renderControlPage(baseUrl) {
             <div class="section-heading"><h2>Run state</h2><span id="run-date" class="section-meta">Today</span></div>
             <div class="panel">
               <div class="detail-row"><span class="detail-label">Status</span><strong id="run-status" class="detail-value">-</strong></div>
-              <div class="detail-row"><span class="detail-label">Attempts</span><strong id="run-attempts" class="detail-value">-</strong></div>
-              <div class="detail-row"><span class="detail-label">Next retry</span><strong id="next-retry" class="detail-value">-</strong></div>
+              <div class="detail-row"><span class="detail-label">RNGdle attempts</span><strong id="run-attempts" class="detail-value">-</strong></div>
+              <div class="detail-row"><span class="detail-label">RNGdle next retry</span><strong id="next-rngdle-retry" class="detail-value">-</strong></div>
+              <div class="detail-row"><span class="detail-label">Email attempts</span><strong id="email-attempts" class="detail-value">-</strong></div>
+              <div class="detail-row"><span class="detail-label">Email next retry</span><strong id="next-email-retry" class="detail-value">-</strong></div>
               <div class="detail-row"><span class="detail-label">Recipients</span><strong id="mail-recipients" class="detail-value">-</strong></div>
             </div>
           </section>
@@ -246,7 +248,8 @@ export function renderControlPage(baseUrl) {
           <div class="form-grid">
             <div class="form-field"><label class="field-label" for="timezone">Timezone</label><input class="input" id="timezone" required></div>
             <div class="form-field"><label class="field-label" for="schedule-time">Daily time</label><input class="input" id="schedule-time" type="time" required></div>
-            <div class="form-field"><label class="field-label" for="retry-minutes">Retry minutes</label><input class="input" id="retry-minutes" type="number" min="1" max="1440" required></div>
+            <div class="form-field"><label class="field-label" for="rngdle-retry-minutes">RNGdle retry minutes</label><input class="input" id="rngdle-retry-minutes" type="number" min="1" max="1440" required></div>
+            <div class="form-field"><label class="field-label" for="email-retry-minutes">Email retry minutes</label><input class="input" id="email-retry-minutes" type="number" min="1" max="1440" required></div>
             <div class="form-field"><label class="field-label" for="poll-seconds">Poll seconds</label><input class="input" id="poll-seconds" type="number" min="5" max="3600" required></div>
             <div class="form-field"><label class="field-label" for="browser-timeout">Browser timeout ms</label><input class="input" id="browser-timeout" type="number" min="5000" max="300000" required></div>
             <div class="form-field"><label class="field-label" for="control-url">Control public URL</label><input class="input" id="control-url" type="url" required></div>
@@ -362,7 +365,9 @@ export function renderControlPage(baseUrl) {
           text('run-date', data.latest.date);
           text('run-status', data.latest.status);
           text('run-attempts', data.latest.attempts);
-          text('next-retry', dateTime(data.latest.nextRetryAt));
+          text('next-rngdle-retry', dateTime(data.latest.nextRngdleRetryAt));
+          text('email-attempts', data.latest.emailAttempts);
+          text('next-email-retry', dateTime(data.latest.nextEmailRetryAt));
           text('mail-state', data.latest.emailSent ? 'Sent' : 'Pending');
           byId('error-section').hidden = !data.latest.lastError;
           text('last-error', data.latest.lastError);
@@ -397,7 +402,7 @@ export function renderControlPage(baseUrl) {
     async function loadSettings() {
       try {
         const data=await request('/api/settings');
-        setInput('timezone',data.timezone); setInput('schedule-time',data.scheduleTime); setInput('retry-minutes',data.retryMinutes); setInput('poll-seconds',data.pollSeconds); setInput('browser-timeout',data.browserTimeoutMs); setInput('control-url',data.controlPublicUrl);
+        setInput('timezone',data.timezone); setInput('schedule-time',data.scheduleTime); setInput('rngdle-retry-minutes',data.rngdleRetryMinutes); setInput('email-retry-minutes',data.emailRetryMinutes); setInput('poll-seconds',data.pollSeconds); setInput('browser-timeout',data.browserTimeoutMs); setInput('control-url',data.controlPublicUrl);
         setInput('rngdle-email',data.rngdleEmail); setInput('smtp-username',data.smtpUsername); setInput('smtp-from',data.smtpFrom); setInput('sender-name',data.mailFromName); setInput('subject-prefix',data.mailSubjectPrefix); setInput('mail-to',data.mailTo);
         setInput('smtp-host',data.smtpHost); setInput('smtp-port',data.smtpPort); byId('smtp-secure').checked=data.smtpSecure; byId('smtp-require-tls').checked=data.smtpRequireTls; byId('smtp-password').value=''; text('secret-state',data.hasSmtpPassword ? '(configured)' : '(missing)');
         settingsLoaded=true;
@@ -409,7 +414,7 @@ export function renderControlPage(baseUrl) {
     byId('auth-form').addEventListener('submit',async(event)=>{ event.preventDefault(); const message=byId('auth-message'); message.className='feedback'; message.textContent=''; byId('auth-submit').disabled=true; try { const data=await request('/api/auth-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({link:byId('auth-link').value})}); message.textContent=data.message; byId('auth-link').value=''; } catch(error) { message.className='feedback error'; message.textContent=error.message; } await refreshOverview(); });
     byId('log-refresh').addEventListener('click',loadLogs); byId('log-level').addEventListener('change',loadLogs);
     byId('email-send').addEventListener('click',async()=>{ const recipients=mailRecipients.length ? mailRecipients.join(', ') : 'the configured recipients'; if(!window.confirm('Send the result email to '+recipients+'?')) return; const button=byId('email-send'); const message=byId('email-message'); button.disabled=true; button.textContent='Sending'; message.className='feedback email-feedback'; message.textContent=''; try { const data=await request('/api/email/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'result'})}); message.textContent=data.message; } catch(error) { message.className='feedback email-feedback error'; message.textContent=error.message; } finally { button.disabled=false; button.textContent='Send email'; } });
-    byId('settings-form').addEventListener('submit',async(event)=>{ event.preventDefault(); const message=byId('settings-message'); const save=byId('settings-save'); message.className='feedback'; message.textContent=''; save.disabled=true; const payload={timezone:byId('timezone').value,scheduleTime:byId('schedule-time').value,retryMinutes:Number(byId('retry-minutes').value),pollSeconds:Number(byId('poll-seconds').value),browserTimeoutMs:Number(byId('browser-timeout').value),controlPublicUrl:byId('control-url').value,rngdleEmail:byId('rngdle-email').value,smtpUsername:byId('smtp-username').value,smtpFrom:byId('smtp-from').value,mailFromName:byId('sender-name').value,mailSubjectPrefix:byId('subject-prefix').value,mailTo:byId('mail-to').value,smtpHost:byId('smtp-host').value,smtpPort:Number(byId('smtp-port').value),smtpSecure:byId('smtp-secure').checked,smtpRequireTls:byId('smtp-require-tls').checked,smtpAppPassword:byId('smtp-password').value}; try { const data=await request('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); message.textContent=data.message; settingsLoaded=false; await loadSettings(); await refreshOverview(); } catch(error) { message.className='feedback error'; message.textContent=error.message; } finally { save.disabled=false; } });
+    byId('settings-form').addEventListener('submit',async(event)=>{ event.preventDefault(); const message=byId('settings-message'); const save=byId('settings-save'); message.className='feedback'; message.textContent=''; save.disabled=true; const payload={timezone:byId('timezone').value,scheduleTime:byId('schedule-time').value,rngdleRetryMinutes:Number(byId('rngdle-retry-minutes').value),emailRetryMinutes:Number(byId('email-retry-minutes').value),pollSeconds:Number(byId('poll-seconds').value),browserTimeoutMs:Number(byId('browser-timeout').value),controlPublicUrl:byId('control-url').value,rngdleEmail:byId('rngdle-email').value,smtpUsername:byId('smtp-username').value,smtpFrom:byId('smtp-from').value,mailFromName:byId('sender-name').value,mailSubjectPrefix:byId('subject-prefix').value,mailTo:byId('mail-to').value,smtpHost:byId('smtp-host').value,smtpPort:Number(byId('smtp-port').value),smtpSecure:byId('smtp-secure').checked,smtpRequireTls:byId('smtp-require-tls').checked,smtpAppPassword:byId('smtp-password').value}; try { const data=await request('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); message.textContent=data.message; settingsLoaded=false; await loadSettings(); await refreshOverview(); } catch(error) { message.className='feedback error'; message.textContent=error.message; } finally { save.disabled=false; } });
     window.addEventListener('resize',()=>{ mainScrollbar.update(); logScrollbar.update(); });
     setInterval(()=>{ refreshOverview(); if(activeView==='logs'&&byId('log-auto').checked) loadLogs(); },3000);
     refreshOverview();

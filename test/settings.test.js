@@ -8,7 +8,7 @@ import { loadRuntimeSettings, publicSettings, saveRuntimeSettings, validateSetti
 function configFor(directory) {
   return {
     timezone: "Asia/Shanghai",
-    schedule: { time: "08:02", retryMinutes: 30, pollSeconds: 30 },
+    schedule: { time: "08:02", retryMinutes: 30, emailRetryMinutes: 1, pollSeconds: 30 },
     rngdle: { email: "player@example.com" },
     browser: { timeoutMs: 45_000 },
     control: { publicUrl: "http://localhost:3000" },
@@ -35,13 +35,16 @@ test("runtime settings persist, hot-apply, and never expose the password", async
   const visible = await saveRuntimeSettings(config, {
     ...publicSettings(config),
     scheduleTime: "09:15",
-    retryMinutes: 45,
+    rngdleRetryMinutes: 45,
+    emailRetryMinutes: 2,
     mailFromName: "RNGdle Today",
     mailTo: "first@example.com, second@example.com",
     smtpAppPassword: "replacement-secret",
   });
 
   assert.equal(config.schedule.time, "09:15");
+  assert.equal(config.schedule.retryMinutes, 45);
+  assert.equal(config.schedule.emailRetryMinutes, 2);
   assert.equal(config.smtp.password, "replacement-secret");
   assert.deepEqual(config.smtp.to, ["first@example.com", "second@example.com"]);
   assert.equal(config.mail.fromName, "RNGdle Today");
@@ -52,6 +55,8 @@ test("runtime settings persist, hot-apply, and never expose the password", async
   const restarted = configFor(directory);
   assert.equal(await loadRuntimeSettings(restarted), true);
   assert.equal(restarted.schedule.time, "09:15");
+  assert.equal(restarted.schedule.retryMinutes, 45);
+  assert.equal(restarted.schedule.emailRetryMinutes, 2);
   assert.equal(restarted.smtp.password, "replacement-secret");
 });
 
@@ -65,4 +70,5 @@ test("runtime settings reject invalid schedule and recipient values", () => {
   const config = configFor("/tmp");
   assert.throws(() => validateSettings({ ...publicSettings(config), scheduleTime: "25:00" }, config), /HH:mm/);
   assert.throws(() => validateSettings({ ...publicSettings(config), mailTo: "not-an-email" }, config), /email/);
+  assert.throws(() => validateSettings({ ...publicSettings(config), emailRetryMinutes: 0 }, config), /emailRetryMinutes/);
 });

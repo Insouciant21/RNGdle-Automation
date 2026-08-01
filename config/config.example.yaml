@@ -3,6 +3,7 @@ timezone: "${TZ:-Asia/Shanghai}"
 schedule:
   time: "${SCHEDULE_TIME:-08:02}"
   retryMinutes: "${RETRY_MINUTES:-30}"
+  emailRetryMinutes: "${EMAIL_RETRY_MINUTES:-1}"
   pollSeconds: "${POLL_SECONDS:-30}"
 
 rngdle:
