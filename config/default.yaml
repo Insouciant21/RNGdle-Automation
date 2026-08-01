@@ -16,6 +16,9 @@ browser:
 
 control:
   port: "${CONTROL_PORT:-3000}"
+  password: "${CONTROL_PASSWORD:-}"
+  sessionDays: "${CONTROL_SESSION_DAYS:-7}"
+  cookieSecure: "${CONTROL_COOKIE_SECURE:-false}"
   # Used in login-expiry notification emails. For a remote host, use an SSH
   # tunnel or a private HTTPS URL rather than exposing the page publicly.
   publicUrl: "${CONTROL_PUBLIC_URL:-http://localhost:3000}"

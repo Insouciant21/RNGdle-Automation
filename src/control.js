@@ -1,6 +1,7 @@
 import http from "node:http";
 import { readFile } from "node:fs/promises";
-import { renderControlPage } from "./control-page.js";
+import { renderControlPage, renderLoginPage, renderSetupPage } from "./control-page.js";
+import { createControlAuth, expiredSessionCookie, parseCookies, sessionCookie } from "./control-auth.js";
 import { errorSummary, getRecentLogs, log } from "./logger.js";
 import {
   buildAuthenticationRequiredMessage,
@@ -75,8 +76,12 @@ export function isSameOriginRequest(request) {
   }
 }
 
-function sendJson(response, status, payload) {
-  response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+function sendJson(response, status, payload, headers = {}) {
+  response.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    ...headers,
+  });
   response.end(JSON.stringify(payload));
 }
 
@@ -193,21 +198,128 @@ export async function createControlServer(
   config,
   { sendRoll = sendRollEmail, sendAuthentication = sendAuthenticationRequiredEmail } = {},
 ) {
+  const auth = await createControlAuth({
+    authPath: config.storage.controlAuthPath,
+    initialPassword: config.control.initialPassword,
+    sessionDays: config.control.sessionDays,
+  });
   let status = { state: "idle", label: "RNGdle service ready" };
   let emailSendInFlight = false;
   const linkListeners = new Set();
   const page = renderControlPage(config.rngdle.baseUrl);
+  const loginPage = renderLoginPage();
+  const setupPage = renderSetupPage();
 
   const server = http.createServer(async (request, response) => {
     try {
       const url = new URL(request.url, "http://localhost");
+      const cookies = parseCookies(request);
+      const sessionToken = cookies.rngdle_control_session;
+      const currentSession = await auth.session(sessionToken);
+      const publicRoute =
+        (request.method === "GET" || request.method === "HEAD") && STATIC_ASSETS.has(url.pathname)
+        || (request.method === "GET" || request.method === "HEAD") && url.pathname === "/login"
+        || (request.method === "GET" || request.method === "HEAD") && url.pathname === "/setup"
+        || request.method === "GET" && url.pathname === "/api/status"
+        || request.method === "GET" && url.pathname === "/api/auth/session"
+        || request.method === "POST" && (url.pathname === "/api/auth/login" || url.pathname === "/api/auth/setup");
+      if (!publicRoute && !currentSession) {
+        if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/preview/")) {
+          sendJson(response, 401, { message: "Control authentication required." });
+        } else {
+          response.writeHead(302, { Location: auth.isConfigured() ? "/login" : "/setup", "Cache-Control": "no-store" });
+          response.end();
+        }
+        return;
+      }
+      const requireSameOrigin = () => {
+        if (!isSameOriginRequest(request)) {
+          const error = new Error("Cross-origin Control requests are not allowed.");
+          error.statusCode = 403;
+          throw error;
+        }
+      };
+      const requireCsrf = () => {
+        if (!currentSession || request.headers["x-csrf-token"] !== currentSession.csrfToken) {
+          const error = new Error("Invalid Control request token.");
+          error.statusCode = 403;
+          throw error;
+        }
+      };
       if ((request.method === "GET" || request.method === "HEAD") && STATIC_ASSETS.has(url.pathname)) {
         await sendStaticAsset(request, response, STATIC_ASSETS.get(url.pathname));
+      } else if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/login") {
+        if (!auth.isConfigured()) {
+          response.writeHead(302, { Location: "/setup", "Cache-Control": "no-store" });
+          response.end();
+        } else if (currentSession) {
+          response.writeHead(302, { Location: "/", "Cache-Control": "no-store" });
+          response.end();
+        } else {
+          sendHtml(response, 200, loginPage);
+        }
+      } else if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/setup") {
+        if (auth.isConfigured()) {
+          response.writeHead(302, { Location: "/login", "Cache-Control": "no-store" });
+          response.end();
+        } else if (currentSession) {
+          response.writeHead(302, { Location: "/", "Cache-Control": "no-store" });
+          response.end();
+        } else {
+          sendHtml(response, 200, setupPage);
+        }
       } else if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/") {
-        response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+        response.writeHead(200, {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "SAMEORIGIN",
+        });
         response.end(request.method === "HEAD" ? undefined : page);
       } else if (request.method === "GET" && url.pathname === "/api/status") {
         sendJson(response, 200, status);
+      } else if (request.method === "GET" && url.pathname === "/api/auth/session") {
+        sendJson(response, 200, currentSession
+          ? { authenticated: true, configured: true, csrfToken: currentSession.csrfToken, expiresAt: currentSession.expiresAt }
+          : { authenticated: false, configured: auth.isConfigured() });
+      } else if (request.method === "POST" && url.pathname === "/api/auth/login") {
+        requireSameOrigin();
+        try {
+          const { password } = await readJson(request);
+          const result = await auth.login(password, request.socket.remoteAddress);
+          sendJson(response, 200, {
+            authenticated: true,
+            csrfToken: result.csrfToken,
+            expiresAt: result.expiresAt,
+          }, {
+            "Set-Cookie": sessionCookie(result.token, result.maxAgeSeconds, config.control.cookieSecure),
+          });
+        } catch (error) {
+          const limited = error.message.startsWith("Too many failed attempts");
+          sendJson(response, limited ? 429 : 401, { message: error.message });
+        }
+      } else if (request.method === "POST" && url.pathname === "/api/auth/setup") {
+        requireSameOrigin();
+        try {
+          const { password, confirmation } = await readJson(request);
+          const result = await auth.setupPassword(password, confirmation);
+          sendJson(response, 201, { authenticated: true, configured: true, csrfToken: result.csrfToken, expiresAt: result.expiresAt }, {
+            "Set-Cookie": sessionCookie(result.token, result.maxAgeSeconds, config.control.cookieSecure),
+          });
+        } catch (error) {
+          sendJson(response, 409, { message: error.message });
+        }
+      } else if (request.method === "POST" && url.pathname === "/api/auth/logout") {
+        requireSameOrigin();
+        requireCsrf();
+        await auth.logout(sessionToken);
+        sendJson(response, 200, { authenticated: false }, { "Set-Cookie": expiredSessionCookie(config.control.cookieSecure) });
+      } else if (request.method === "PUT" && url.pathname === "/api/auth/password") {
+        requireSameOrigin();
+        requireCsrf();
+        const { password, confirmation } = await readJson(request);
+        await auth.changePassword(password, confirmation);
+        sendJson(response, 200, { message: "Control password changed. Sign in again." }, { "Set-Cookie": expiredSessionCookie(config.control.cookieSecure) });
       } else if (request.method === "GET" && url.pathname === "/api/overview") {
         sendJson(response, 200, await overviewPayload(config, status));
       } else if (request.method === "GET" && url.pathname === "/api/logs") {
@@ -223,10 +335,8 @@ export async function createControlServer(
       } else if (request.method === "GET" && url.pathname === "/api/settings") {
         sendJson(response, 200, publicSettings(config));
       } else if (request.method === "PUT" && url.pathname === "/api/settings") {
-        if (!isSameOriginRequest(request)) {
-          sendJson(response, 403, { message: "Cross-origin settings updates are not allowed." });
-          return;
-        }
+        requireSameOrigin();
+        requireCsrf();
         const input = await readJson(request);
         const before = publicSettings(config);
         const settings = await saveRuntimeSettings(config, input);
@@ -246,10 +356,8 @@ export async function createControlServer(
           sendHtml(response, 200, preview, { preview: true });
         }
       } else if (request.method === "POST" && url.pathname === "/api/email/send") {
-        if (!isSameOriginRequest(request)) {
-          sendJson(response, 403, { message: "Cross-origin email requests are not allowed." });
-          return;
-        }
+        requireSameOrigin();
+        requireCsrf();
         if (emailSendInFlight) {
           sendJson(response, 409, { message: "An email is already being sent." });
           return;
@@ -290,10 +398,8 @@ export async function createControlServer(
           emailSendInFlight = false;
         }
       } else if (request.method === "POST" && url.pathname === "/api/auth-link") {
-        if (!isSameOriginRequest(request)) {
-          sendJson(response, 403, { message: "Cross-origin authentication requests are not allowed." });
-          return;
-        }
+        requireSameOrigin();
+        requireCsrf();
         const { link } = await readJson(request);
         if (status.state !== "waiting") {
           sendJson(response, 409, { message: "The browser is not currently waiting for authentication." });
@@ -307,7 +413,7 @@ export async function createControlServer(
         sendJson(response, 404, { message: "Not found" });
       }
     } catch (error) {
-      sendJson(response, 400, { message: errorSummary(error) });
+      sendJson(response, error.statusCode ?? 400, { message: errorSummary(error) });
     }
   });
 

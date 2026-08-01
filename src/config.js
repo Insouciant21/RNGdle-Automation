@@ -59,14 +59,14 @@ function validateTime(value) {
   return time;
 }
 
-export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./config/config.yaml", env = process.env) {
+export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./config/default.yaml", env = process.env) {
   const absoluteConfigPath = path.resolve(configPath);
   let source;
   try {
     source = await fs.readFile(absoluteConfigPath, "utf8");
   } catch (error) {
     if (error.code === "ENOENT") {
-      throw new Error(`Configuration file not found: ${absoluteConfigPath}. Start from config/config.example.yaml.`);
+      throw new Error(`Configuration file not found: ${absoluteConfigPath}. Use the bundled config/default.yaml or set CONFIG_PATH.`);
     }
     throw error;
   }
@@ -127,6 +127,9 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
     control: {
       port: positiveInteger(raw.control?.port ?? 3000, "control.port"),
       publicUrl: controlPublicUrl,
+      initialPassword: optionalString(raw.control?.password),
+      sessionDays: positiveInteger(raw.control?.sessionDays ?? 7, "control.sessionDays"),
+      cookieSecure: booleanValue(raw.control?.cookieSecure ?? false, "control.cookieSecure"),
     },
     smtp: {
       host: requiredString(raw.smtp?.host, "smtp.host"),
@@ -154,6 +157,7 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
       profileDirectory: path.join(storageDirectory, "browser-profile"),
       statePath: path.join(storageDirectory, "state.json"),
       settingsPath: path.join(storageDirectory, "settings.json"),
+      controlAuthPath: path.join(storageDirectory, "control-auth.json"),
       lockPath: path.join(storageDirectory, "workflow.lock"),
     },
   };

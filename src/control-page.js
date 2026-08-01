@@ -37,6 +37,8 @@ export function renderControlPage(baseUrl) {
     .brand-context,.mono,.label { font-family:var(--font-mono); }
     .brand-context { color:var(--prose-3); font-size:10px; text-transform:uppercase; }
     .header-state { grid-column:3; display:flex; align-items:center; justify-self:end; gap:8px; min-width:0; color:var(--prose-2); font:700 11px/1.2 var(--font-mono); text-align:right; text-transform:uppercase; }
+    .header-action { padding:5px 8px; border:1px solid var(--outline); border-radius:4px; background:transparent; color:var(--prose-2); font:700 10px/1.2 var(--font-mono); text-transform:uppercase; cursor:pointer; }
+    .header-action:hover { border-color:var(--prose); color:var(--prose); background:var(--raised); }
     .dot { flex:0 0 auto; width:8px; height:8px; border-radius:50%; background:var(--prose-3); }
     .dot.waiting,.dot.error { background:var(--danger); }
     .dot.authenticated,.dot.idle,.dot.success { background:var(--success); }
@@ -134,6 +136,7 @@ export function renderControlPage(baseUrl) {
     .form-field .field-label { margin:0 0 6px; }
     .settings-actions { display:flex; align-items:center; justify-content:flex-end; gap:14px; padding-top:20px; }
     .secret-state { color:var(--success); }
+    .password-help { margin:8px 0 0; color:var(--prose-3); font:11px/1.45 var(--font-mono); }
     .main-scroll.ps,.log-panel.ps { overflow:hidden !important; }
     .ps--active-y > .ps__rail-y { width:10px; opacity:.5; background:transparent; z-index:20; }
     .ps--active-x > .ps__rail-x { height:10px; opacity:.5; background:transparent; z-index:20; }
@@ -155,7 +158,7 @@ export function renderControlPage(baseUrl) {
       <button class="tab" role="tab" aria-selected="false" data-view="auth">Authentication</button>
       <button class="tab" role="tab" aria-selected="false" data-view="settings">Settings</button>
     </nav>
-    <div class="header-state"><span id="header-dot" class="dot"></span><span id="header-status">Connecting</span></div>
+    <div class="header-state"><span id="header-dot" class="dot"></span><span id="header-status">Connecting</span><button id="logout-button" class="header-action" type="button">Sign out</button></div>
   </header>
   <div id="main-scroll" class="main-scroll" tabindex="0">
   <main>
@@ -275,6 +278,14 @@ export function renderControlPage(baseUrl) {
             <div class="form-field full"><div class="toolbar-group"><label class="check"><input id="smtp-secure" type="checkbox">Implicit TLS</label><label class="check"><input id="smtp-require-tls" type="checkbox">Require STARTTLS</label></div></div>
           </div>
         </section>
+        <section class="settings-group">
+          <div class="settings-heading"><h2>Security</h2><p>Control access</p></div>
+          <div class="form-grid">
+            <div class="form-field"><label class="field-label" for="control-password">New Control password</label><input class="input" id="control-password" type="password" autocomplete="new-password" minlength="8"></div>
+            <div class="form-field"><label class="field-label" for="control-password-confirm">Confirm password</label><input class="input" id="control-password-confirm" type="password" autocomplete="new-password" minlength="8"></div>
+            <div class="form-field full"><p class="password-help">Changing the password signs out all active sessions. Minimum 8 characters.</p><div id="password-message" class="feedback" role="status"></div><button id="password-save" class="button secondary" type="button">Change Control password</button></div>
+          </div>
+        </section>
         <div class="settings-actions"><span id="settings-message" class="feedback" role="status"></span><button id="settings-save" class="button" type="submit">Save settings</button></div>
       </form>
     </section>
@@ -291,10 +302,15 @@ export function renderControlPage(baseUrl) {
     let activeView = 'overview';
     let mailRecipients = [];
     let settingsLoaded = false;
+    let csrfToken = null;
 
     async function request(url, options) {
-      const response = await fetch(url, { cache:'no-store', ...options });
+      const method=(options?.method||'GET').toUpperCase();
+      const headers={...(options?.headers||{})};
+      if (!['GET','HEAD','OPTIONS'].includes(method) && csrfToken) headers['X-CSRF-Token']=csrfToken;
+      const response = await fetch(url, { cache:'no-store', credentials:'same-origin', ...options, headers });
       const data = await response.json();
+      if (response.status === 401) { window.location.href='/login'; throw new Error(data.message || 'Authentication required'); }
       if (!response.ok) throw new Error(data.message || ('HTTP ' + response.status));
       return data;
     }
@@ -415,9 +431,98 @@ export function renderControlPage(baseUrl) {
     byId('log-refresh').addEventListener('click',loadLogs); byId('log-level').addEventListener('change',loadLogs);
     byId('email-send').addEventListener('click',async()=>{ const recipients=mailRecipients.length ? mailRecipients.join(', ') : 'the configured recipients'; if(!window.confirm('Send the result email to '+recipients+'?')) return; const button=byId('email-send'); const message=byId('email-message'); button.disabled=true; button.textContent='Sending'; message.className='feedback email-feedback'; message.textContent=''; try { const data=await request('/api/email/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'result'})}); message.textContent=data.message; } catch(error) { message.className='feedback email-feedback error'; message.textContent=error.message; } finally { button.disabled=false; button.textContent='Send email'; } });
     byId('settings-form').addEventListener('submit',async(event)=>{ event.preventDefault(); const message=byId('settings-message'); const save=byId('settings-save'); message.className='feedback'; message.textContent=''; save.disabled=true; const payload={timezone:byId('timezone').value,scheduleTime:byId('schedule-time').value,rngdleRetryMinutes:Number(byId('rngdle-retry-minutes').value),emailRetryMinutes:Number(byId('email-retry-minutes').value),pollSeconds:Number(byId('poll-seconds').value),browserTimeoutMs:Number(byId('browser-timeout').value),controlPublicUrl:byId('control-url').value,rngdleEmail:byId('rngdle-email').value,smtpUsername:byId('smtp-username').value,smtpFrom:byId('smtp-from').value,mailFromName:byId('sender-name').value,mailSubjectPrefix:byId('subject-prefix').value,mailTo:byId('mail-to').value,smtpHost:byId('smtp-host').value,smtpPort:Number(byId('smtp-port').value),smtpSecure:byId('smtp-secure').checked,smtpRequireTls:byId('smtp-require-tls').checked,smtpAppPassword:byId('smtp-password').value}; try { const data=await request('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); message.textContent=data.message; settingsLoaded=false; await loadSettings(); await refreshOverview(); } catch(error) { message.className='feedback error'; message.textContent=error.message; } finally { save.disabled=false; } });
+    byId('password-save').addEventListener('click',async()=>{ const message=byId('password-message'); const button=byId('password-save'); message.className='feedback'; message.textContent=''; button.disabled=true; try { await request('/api/auth/password',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:byId('control-password').value,confirmation:byId('control-password-confirm').value})}); message.textContent='Password changed. Redirecting to sign in...'; setTimeout(()=>{ window.location.href='/login'; },500); } catch(error) { message.className='feedback error'; message.textContent=error.message; button.disabled=false; } });
+    byId('logout-button').addEventListener('click',async()=>{ try { await request('/api/auth/logout',{method:'POST'}); } finally { window.location.href='/login'; } });
     window.addEventListener('resize',()=>{ mainScrollbar.update(); logScrollbar.update(); });
     setInterval(()=>{ refreshOverview(); if(activeView==='logs'&&byId('log-auto').checked) loadLogs(); },3000);
-    refreshOverview();
+    (async()=>{ try { const session=await request('/api/auth/session'); if (!session.authenticated) { window.location.href='/login'; return; } csrfToken=session.csrfToken; await refreshOverview(); } catch (_) {} })();
+  </script>
+</body>
+</html>`;
+}
+
+export function renderLoginPage() {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RNGdle Control sign in</title>
+  <link rel="preload" href="/assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/fonts/space-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <style>
+    @font-face { font-family:Inter; font-style:normal; font-display:swap; font-weight:100 900; src:url("/assets/fonts/inter-latin.woff2") format("woff2"); }
+    @font-face { font-family:"Space Mono"; font-style:normal; font-display:swap; font-weight:400; src:url("/assets/fonts/space-mono-400-latin.woff2") format("woff2"); }
+    :root { color-scheme:light; --site:#fafafa; --surface:#fff; --prose:#111827; --muted:#6b7280; --outline:#d1d5db; --danger:#b91c1c; }
+    @media (prefers-color-scheme:dark) { :root { color-scheme:dark; --site:#19181d; --surface:#25242a; --prose:#f0f0f0; --muted:#aaa8b1; --outline:#52515a; --danger:#fca5a5; } }
+    * { box-sizing:border-box; } html,body { min-height:100%; margin:0; } body { display:grid; place-items:center; padding:24px; background:var(--site); color:var(--prose); font:14px/1.5 Inter,system-ui,sans-serif; }
+    .login { width:min(100%,420px); padding:30px; border:1px solid var(--outline); border-radius:8px; background:var(--surface); box-shadow:0 16px 40px rgba(17,24,39,.08); }
+    h1 { margin:0; font-size:22px; } p { margin:6px 0 24px; color:var(--muted); font:11px/1.5 "Space Mono",monospace; text-transform:uppercase; }
+    label { display:block; margin:0 0 7px; color:var(--muted); font:700 10px/1.3 "Space Mono",monospace; text-transform:uppercase; }
+    input { width:100%; min-height:44px; padding:10px 12px; border:1px solid var(--outline); border-radius:6px; background:transparent; color:var(--prose); font:16px/1.4 Inter,system-ui,sans-serif; outline:0; } input:focus { border-color:var(--prose); box-shadow:0 0 0 1px var(--prose); }
+    button { width:100%; min-height:42px; margin-top:14px; border:2px solid var(--prose); border-radius:6px; background:var(--prose); color:var(--surface); font:700 11px/1.3 Inter,system-ui,sans-serif; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; } button:disabled { opacity:.55; cursor:wait; }
+    .feedback { min-height:20px; margin-top:14px; color:var(--danger); font:11px/1.4 "Space Mono",monospace; }
+  </style>
+</head>
+<body>
+  <main class="login">
+    <h1>RNGdle Control</h1>
+    <p>Private operations console</p>
+    <form id="login-form">
+      <label for="password">Control password</label>
+      <input id="password" type="password" autocomplete="current-password" required autofocus>
+      <button id="submit" type="submit">Sign in</button>
+      <div id="feedback" class="feedback" role="alert"></div>
+    </form>
+  </main>
+  <script>
+    const form=document.getElementById('login-form'); const password=document.getElementById('password'); const button=document.getElementById('submit'); const feedback=document.getElementById('feedback');
+    form.addEventListener('submit',async(event)=>{ event.preventDefault(); button.disabled=true; feedback.textContent=''; try { const response=await fetch('/api/auth/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:password.value})}); const data=await response.json(); if(!response.ok) throw new Error(data.message||'Sign in failed'); window.location.href='/'; } catch(error) { feedback.textContent=error.message; password.select(); button.disabled=false; } });
+  </script>
+</body>
+</html>`;
+}
+
+export function renderSetupPage() {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Set up RNGdle Control</title>
+  <link rel="preload" href="/assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/fonts/space-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <style>
+    @font-face { font-family:Inter; font-style:normal; font-display:swap; font-weight:100 900; src:url("/assets/fonts/inter-latin.woff2") format("woff2"); }
+    @font-face { font-family:"Space Mono"; font-style:normal; font-display:swap; font-weight:400; src:url("/assets/fonts/space-mono-400-latin.woff2") format("woff2"); }
+    :root { color-scheme:light; --site:#fafafa; --surface:#fff; --prose:#111827; --muted:#6b7280; --outline:#d1d5db; --danger:#b91c1c; }
+    @media (prefers-color-scheme:dark) { :root { color-scheme:dark; --site:#19181d; --surface:#25242a; --prose:#f0f0f0; --muted:#aaa8b1; --outline:#52515a; --danger:#fca5a5; } }
+    * { box-sizing:border-box; } html,body { min-height:100%; margin:0; } body { display:grid; place-items:center; padding:24px; background:var(--site); color:var(--prose); font:14px/1.5 Inter,system-ui,sans-serif; }
+    .setup { width:min(100%,460px); padding:30px; border:1px solid var(--outline); border-radius:8px; background:var(--surface); box-shadow:0 16px 40px rgba(17,24,39,.08); }
+    h1 { margin:0; font-size:22px; } p { margin:6px 0 24px; color:var(--muted); font:11px/1.5 "Space Mono",monospace; text-transform:uppercase; } .note { margin:-10px 0 22px; text-transform:none; }
+    label { display:block; margin:0 0 7px; color:var(--muted); font:700 10px/1.3 "Space Mono",monospace; text-transform:uppercase; }
+    input { width:100%; min-height:44px; margin-bottom:14px; padding:10px 12px; border:1px solid var(--outline); border-radius:6px; background:transparent; color:var(--prose); font:16px/1.4 Inter,system-ui,sans-serif; outline:0; } input:focus { border-color:var(--prose); box-shadow:0 0 0 1px var(--prose); }
+    button { width:100%; min-height:42px; margin-top:2px; border:2px solid var(--prose); border-radius:6px; background:var(--prose); color:var(--surface); font:700 11px/1.3 Inter,system-ui,sans-serif; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; } button:disabled { opacity:.55; cursor:wait; }
+    .feedback { min-height:20px; margin-top:14px; color:var(--danger); font:11px/1.4 "Space Mono",monospace; }
+  </style>
+</head>
+<body>
+  <main class="setup">
+    <h1>Set up RNGdle Control</h1>
+    <p>First-run access protection</p>
+    <p class="note">Create the password used to access this Control page. It is stored as a one-way hash in the Docker data volume.</p>
+    <form id="setup-form">
+      <label for="password">Control password</label>
+      <input id="password" type="password" autocomplete="new-password" minlength="8" required>
+      <label for="confirmation">Confirm password</label>
+      <input id="confirmation" type="password" autocomplete="new-password" minlength="8" required>
+      <button id="submit" type="submit">Create password</button>
+      <div id="feedback" class="feedback" role="alert"></div>
+    </form>
+  </main>
+  <script>
+    const form=document.getElementById('setup-form'); const password=document.getElementById('password'); const confirmation=document.getElementById('confirmation'); const button=document.getElementById('submit'); const feedback=document.getElementById('feedback');
+    form.addEventListener('submit',async(event)=>{ event.preventDefault(); button.disabled=true; feedback.textContent=''; try { const response=await fetch('/api/auth/setup',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:password.value,confirmation:confirmation.value})}); const data=await response.json(); if(!response.ok) throw new Error(data.message||'Setup failed'); window.location.href='/'; } catch(error) { feedback.textContent=error.message; button.disabled=false; } });
   </script>
 </body>
 </html>`;

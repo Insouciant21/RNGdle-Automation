@@ -37,7 +37,7 @@ test("control APIs expose operations without exposing secrets", async (context) 
     schedule: { time: "08:02", retryMinutes: 30, pollSeconds: 30 },
     rngdle: { baseUrl: "https://www.rngdle.com", email: "player@example.com" },
     browser: { timeoutMs: 45_000 },
-    control: { port: 0, publicUrl: "http://localhost:3000" },
+    control: { port: 0, publicUrl: "http://localhost:3000", initialPassword: "test-control-password", sessionDays: 7, cookieSecure: false },
     smtp: {
       host: "smtp.example.com",
       port: 587,
@@ -50,7 +50,7 @@ test("control APIs expose operations without exposing secrets", async (context) 
       to: ["receiver@example.com"],
     },
     mail: { fromName: "RNGdle Today", subjectPrefix: "[RNGdle]" },
-    storage: { statePath, settingsPath: path.join(directory, "settings.json") },
+    storage: { statePath, settingsPath: path.join(directory, "settings.json"), controlAuthPath: path.join(directory, "control-auth.json") },
   };
   const sent = [];
   const control = await createControlServer(config, {
@@ -66,7 +66,35 @@ test("control APIs expose operations without exposing secrets", async (context) 
   context.after(() => control.close());
   const baseUrl = `http://127.0.0.1:${control.address().port}`;
 
-  const page = await (await fetch(baseUrl)).text();
+  const unauthenticated = await fetch(baseUrl, { redirect: "manual" });
+  assert.equal(unauthenticated.status, 302);
+  assert.equal(unauthenticated.headers.get("location"), "/login");
+  const loginPage = await (await fetch(`${baseUrl}/login`)).text();
+  assert.match(loginPage, /Control password/);
+  const publicSession = await (await fetch(`${baseUrl}/api/auth/session`)).json();
+  assert.equal(publicSession.authenticated, false);
+  const protectedOverview = await fetch(`${baseUrl}/api/overview`);
+  assert.equal(protectedOverview.status, 401);
+  const login = await fetch(`${baseUrl}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: baseUrl },
+    body: JSON.stringify({ password: "test-control-password" }),
+  });
+  assert.equal(login.status, 200);
+  const loginData = await login.json();
+  const cookie = login.headers.get("set-cookie").split(";", 1)[0];
+  const csrfToken = loginData.csrfToken;
+  const authorizedFetch = (path, options = {}) => {
+    const method = (options.method ?? "GET").toUpperCase();
+    const headers = {
+      Cookie: cookie,
+      ...(method !== "GET" && method !== "HEAD" ? { "X-CSRF-Token": csrfToken } : {}),
+      ...(options.headers ?? {}),
+    };
+    return fetch(`${baseUrl}${path}`, { ...options, headers });
+  };
+
+  const page = await (await authorizedFetch("/")).text();
   assert.match(page, /@font-face/);
   assert.match(page, /\/assets\/fonts\/inter-latin\.woff2/);
   assert.match(page, /id="email-send"/);
@@ -86,25 +114,25 @@ test("control APIs expose operations without exposing secrets", async (context) 
   assert.match(page, /\.main-scroll\.ps,\.log-panel\.ps \{ overflow:hidden !important; \}/);
   assert.match(page, /<header class="topbar">[\s\S]*<nav class="tabs"[\s\S]*<\/header>/);
   assert.doesNotMatch(page, /tabs-wrap/);
-  const font = await fetch(`${baseUrl}/assets/fonts/space-mono-700-latin.woff2`);
+  const font = await authorizedFetch("/assets/fonts/space-mono-700-latin.woff2");
   assert.equal(font.status, 200);
   assert.equal(font.headers.get("content-type"), "font/woff2");
   assert.ok((await font.arrayBuffer()).byteLength > 1_000);
-  const scrollbarScript = await fetch(`${baseUrl}/assets/vendor/perfect-scrollbar.min.js`);
+  const scrollbarScript = await authorizedFetch("/assets/vendor/perfect-scrollbar.min.js");
   assert.equal(scrollbarScript.status, 200);
   assert.match(scrollbarScript.headers.get("content-type"), /text\/javascript/);
   assert.ok((await scrollbarScript.arrayBuffer()).byteLength > 10_000);
-  const scrollbarStyles = await fetch(`${baseUrl}/assets/vendor/perfect-scrollbar.css`);
+  const scrollbarStyles = await authorizedFetch("/assets/vendor/perfect-scrollbar.css");
   assert.equal(scrollbarStyles.status, 200);
   assert.match(scrollbarStyles.headers.get("content-type"), /text\/css/);
 
-  const overview = await (await fetch(`${baseUrl}/api/overview`)).json();
+  const overview = await (await authorizedFetch("/api/overview")).json();
   assert.equal(overview.result.number, 123456);
   assert.equal(overview.result.rarity, "trash");
   assert.deepEqual(overview.result.badges, []);
   assert.equal(overview.latest.emailSent, true);
 
-  const settings = await (await fetch(`${baseUrl}/api/settings`)).json();
+  const settings = await (await authorizedFetch("/api/settings")).json();
   assert.equal(settings.hasSmtpPassword, true);
   assert.equal(settings.mailFromName, "RNGdle Today");
   assert.equal(settings.rngdleRetryMinutes, 30);
@@ -112,14 +140,14 @@ test("control APIs expose operations without exposing secrets", async (context) 
   assert.equal("smtpAppPassword" in settings, false);
   assert.doesNotMatch(JSON.stringify(settings), /never-return-this/);
 
-  const rejected = await fetch(`${baseUrl}/api/settings`, {
+  const rejected = await authorizedFetch("/api/settings", {
     method: "PUT",
     headers: { "Content-Type": "application/json", Origin: "https://example.org" },
     body: JSON.stringify(settings),
   });
   assert.equal(rejected.status, 403);
 
-  const updated = await fetch(`${baseUrl}/api/settings`, {
+  const updated = await authorizedFetch("/api/settings", {
     method: "PUT",
     headers: { "Content-Type": "application/json", Origin: baseUrl },
     body: JSON.stringify({ ...settings, scheduleTime: "09:30", smtpAppPassword: "" }),
@@ -127,22 +155,22 @@ test("control APIs expose operations without exposing secrets", async (context) 
   assert.equal(updated.status, 200);
   assert.equal(config.schedule.time, "09:30");
 
-  const preview = await fetch(`${baseUrl}/preview/email?type=result`);
+  const preview = await authorizedFetch("/preview/email?type=result");
   assert.equal(preview.status, 200);
   assert.match(preview.headers.get("content-security-policy"), /default-src 'none'/);
   assert.match(await preview.text(), /123456/);
 
-  const invalidPreview = await fetch(`${baseUrl}/preview/email?type=unknown`);
+  const invalidPreview = await authorizedFetch("/preview/email?type=unknown");
   assert.equal(invalidPreview.status, 400);
 
-  const rejectedEmail = await fetch(`${baseUrl}/api/email/send`, {
+  const rejectedEmail = await authorizedFetch("/api/email/send", {
     method: "POST",
     headers: { "Content-Type": "application/json", Origin: "https://example.org" },
     body: JSON.stringify({ type: "result" }),
   });
   assert.equal(rejectedEmail.status, 403);
 
-  const resultEmail = await fetch(`${baseUrl}/api/email/send`, {
+  const resultEmail = await authorizedFetch("/api/email/send", {
     method: "POST",
     headers: { "Content-Type": "application/json", Origin: baseUrl },
     body: JSON.stringify({ type: "result" }),
@@ -150,7 +178,7 @@ test("control APIs expose operations without exposing secrets", async (context) 
   assert.equal(resultEmail.status, 200);
   assert.deepEqual(sent.at(-1), { type: "result", date: "2026-07-29", number: 123456 });
 
-  const authenticationEmail = await fetch(`${baseUrl}/api/email/send`, {
+  const authenticationEmail = await authorizedFetch("/api/email/send", {
     method: "POST",
     headers: { "Content-Type": "application/json", Origin: baseUrl },
     body: JSON.stringify({ type: "authentication" }),
@@ -158,7 +186,7 @@ test("control APIs expose operations without exposing secrets", async (context) 
   assert.equal(authenticationEmail.status, 200);
   assert.deepEqual(sent.at(-1), { type: "authentication" });
 
-  const logs = await (await fetch(`${baseUrl}/api/logs?level=info`)).json();
+  const logs = await (await authorizedFetch("/api/logs?level=info")).json();
   assert.ok(logs.logs.some((entry) => entry.message === "Control page started"));
   assert.ok(logs.logs.some((entry) => entry.message === "Control email sent"));
 });

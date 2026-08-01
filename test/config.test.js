@@ -27,7 +27,7 @@ test("loads generic SMTP settings from environment variables", async (context) =
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "rngdle-config-"));
   context.after(() => fs.rm(directory, { recursive: true, force: true }));
   const configPath = path.join(directory, "config.yaml");
-  await fs.copyFile(path.resolve("config/config.example.yaml"), configPath);
+  await fs.copyFile(path.resolve("config/default.yaml"), configPath);
   const config = await loadConfig(configPath, {
     RNGDLE_EMAIL: "player@outlook.com",
     SMTP_USER: "sender@example.com",
@@ -50,7 +50,7 @@ test("accepts the legacy mail retry environment alias", async (context) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "rngdle-config-"));
   context.after(() => fs.rm(directory, { recursive: true, force: true }));
   const configPath = path.join(directory, "config.yaml");
-  await fs.copyFile(path.resolve("config/config.example.yaml"), configPath);
+  await fs.copyFile(path.resolve("config/default.yaml"), configPath);
   const config = await loadConfig(configPath, {
     RNGDLE_EMAIL: "player@outlook.com",
     SMTP_USER: "sender@example.com",
@@ -73,7 +73,7 @@ test("rejects password SMTP configuration without a credential", async (context)
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "rngdle-config-"));
   context.after(() => fs.rm(directory, { recursive: true, force: true }));
   const configPath = path.join(directory, "config.yaml");
-  await fs.copyFile(path.resolve("config/config.example.yaml"), configPath);
+  await fs.copyFile(path.resolve("config/default.yaml"), configPath);
   await assert.rejects(
     () => loadConfig(configPath, { RNGDLE_EMAIL: "player@example.com", SMTP_USER: "sender@example.com", MAIL_TO: "receiver@example.com" }),
     /smtp\.password is required/,
