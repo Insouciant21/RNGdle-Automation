@@ -60,63 +60,12 @@ config/default.yaml + .env
 
 ### 启动
 
-RNGdle 应用和公网反向代理由两个独立的 Compose 项目管理。首次部署时先创建共享网络：
-
-```bash
-docker network inspect reverse-proxy >/dev/null 2>&1 || docker network create reverse-proxy
-```
-
-然后先启动应用，再到上级目录的独立 Nginx 项目启动反向代理：
-
 ```bash
 docker compose up -d --build rngdle
-cd ../nginx
-docker compose up -d nginx
-cd ../RNGdle-Automation
 docker compose logs -f rngdle
 ```
 
-RNGdle 应用直接暴露宿主机的 `0.0.0.0:38080`，可通过 `http://服务器地址:38080` 访问。域名反代由独立 Nginx 自行管理，不属于本项目启动流程。
-
-### 复用独立 Nginx
-
-其他 Docker Compose 应用可以加入同一个 `reverse-proxy` 网络，然后在独立的 [`../nginx/`](../nginx/) 项目中的 `conf.d/` 增加站点配置。其他应用不需要发布宿主机的 `80/443`：
-
-```yaml
-services:
-  other-app:
-    expose:
-      - "8080"
-    networks:
-      - reverse-proxy
-
-networks:
-  reverse-proxy:
-    external: true
-    name: reverse-proxy
-```
-
-对应的 Nginx 配置可以使用该 Compose 服务名：
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name other.example.com;
-
-    location / {
-        proxy_pass http://other-app:8080;
-    }
-}
-```
-
-修改 [`../nginx/conf.d/`](../nginx/conf.d/) 中的配置后检查并重载：
-
-```bash
-cd ../nginx
-docker compose exec nginx nginx -t
-docker compose exec nginx nginx -s reload
-cd ../RNGdle-Automation
-```
+RNGdle 应用直接暴露宿主机的 `0.0.0.0:38080`，可通过 `http://服务器地址:38080` 访问。若使用 1Panel 或其他宿主机反向代理，将域名转发到该端口即可。
 
 ### 首次设置与认证
 
@@ -168,9 +117,6 @@ docker compose start rngdle
 ```bash
 git pull --ff-only
 docker compose up -d --build rngdle
-cd ../nginx
-docker compose up -d nginx
-cd ../RNGdle-Automation
 ```
 
 named volume `rngdle_automation_rngdle-data` 保存：
@@ -180,7 +126,7 @@ named volume `rngdle_automation_rngdle-data` 保存：
 - `settings.json`：Control 的运行时配置
 - `control-auth.json`：Control 密码哈希和 Session
 
-`docker compose down` 会保留应用数据；`docker compose down -v` 会删除登录会话、历史状态和设置。独立 Nginx 的证书卷由上级 [`../nginx/`](../nginx/) 项目管理，不会被应用 Compose 的 `down -v` 删除。若要恢复 `.env` 的配置，删除运行时覆盖后重启：
+`docker compose down` 会保留应用数据；`docker compose down -v` 会删除登录会话、历史状态和设置。若要恢复 `.env` 的配置，删除运行时覆盖后重启：
 
 ```bash
 docker compose exec rngdle rm -f /app/data/settings.json
