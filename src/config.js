@@ -154,7 +154,7 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
     },
     storage: {
       directory: storageDirectory,
-      profileDirectory: path.join(storageDirectory, "browser-profile"),
+      cookiePath: path.join(storageDirectory, "cookies.json"),
       statePath: path.join(storageDirectory, "state.json"),
       settingsPath: path.join(storageDirectory, "settings.json"),
       controlAuthPath: path.join(storageDirectory, "control-auth.json"),

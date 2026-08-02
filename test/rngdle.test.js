@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AuthenticationRequiredError, normalizeHomePayload } from "../src/rngdle.js";
+import { AuthenticationRequiredError, normalizeHomePayload, parseServerActionResult } from "../src/rngdle.js";
+
+test("parses the authenticated Next.js roll action response", () => {
+  assert.deepEqual(
+    parseServerActionResult('0:{"a":"$@1"}\n1:{"number":123456,"badges":[],"totalScore":42,"recorded":true}\n'),
+    { number: 123456, badges: [], totalScore: 42, recorded: true },
+  );
+});
 
 test("normalizes the current roll and badge fields from /api/home", () => {
   assert.deepEqual(

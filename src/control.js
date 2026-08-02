@@ -402,12 +402,12 @@ export async function createControlServer(
         requireCsrf();
         const { link } = await readJson(request);
         if (status.state !== "waiting") {
-          sendJson(response, 409, { message: "The browser is not currently waiting for authentication." });
+          sendJson(response, 409, { message: "The HTTP session is not currently waiting for authentication." });
         } else if (!isAllowedAuthenticationLink(link, config.rngdle.baseUrl)) {
           sendJson(response, 400, { message: "Enter a valid HTTPS RNGdle magic-link URL." });
         } else {
           for (const listener of linkListeners) listener(link);
-          sendJson(response, 202, { message: "Link sent to the persistent browser." });
+          sendJson(response, 202, { message: "Link sent to the HTTP session." });
         }
       } else {
         sendJson(response, 404, { message: "Not found" });

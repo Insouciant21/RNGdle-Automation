@@ -223,7 +223,7 @@ export function renderControlPage(baseUrl) {
     </section>
 
     <section id="view-auth" class="view" role="tabpanel" hidden>
-      <h1 class="view-title">Authentication</h1><p class="view-kicker">Persistent RNGdle session</p>
+      <h1 class="view-title">Authentication</h1><p class="view-kicker">Persistent RNGdle HTTP session</p>
       <div class="auth-page">
         <section class="section">
           <div class="section-heading"><h2>RNGdle account</h2><span class="section-meta">Magic link</span></div>
@@ -234,7 +234,7 @@ export function renderControlPage(baseUrl) {
               <form id="auth-form">
                 <label class="field-label" for="auth-link">Email magic-link URL</label>
                 <input class="input" id="auth-link" type="url" inputmode="url" autocomplete="off" placeholder="https://www.rngdle.com/..." required>
-                <button class="button block secondary" id="auth-submit" type="submit" style="margin-top:10px">Open in persistent browser</button>
+                <button class="button block secondary" id="auth-submit" type="submit" style="margin-top:10px">Verify magic link</button>
               </form>
               <div id="auth-message" class="feedback" role="status"></div>
             </div>
