@@ -6,12 +6,13 @@
 
 ## 功能
 
-- Docker Compose 常驻调度，Playwright 持久化登录
+- Docker Compose 常驻调度，HTTP Cookie 持久化登录，无浏览器进程
 - 登录失效时通过 Control 页面重新认证
 - RNGdle roll 和邮件投递分别重试，任务幂等
 - RNGdle 风格 HTML 邮件、纯文本邮件和邮件预览
+- 可选 DeepSeek / OpenAI 兼容 LLM 自动作诗：读取实时词库和变形，校验后提交
 - Control 页面提供 Overview、Logs、Authentication、Settings
-- 浏览器会话、状态和运行时设置保存于 Docker named volume
+- 登录 Cookie、状态和运行时设置保存于 Docker named volume
 
 ## 部署
 
@@ -32,6 +33,7 @@ cp .env.example .env
 | `RETRY_MINUTES` | `30` | RNGdle roll 失败重试间隔 |
 | `EMAIL_RETRY_MINUTES` | `1` | 邮件发送失败重试间隔 |
 | `RNGDLE_EMAIL` | 必填 | RNGdle 登录邮箱 |
+| `HTTP_TIMEOUT_MS` | `45000` | 网站 HTTP 请求超时，兼容旧 `BROWSER_TIMEOUT_MS` |
 | `SMTP_HOST` | - | SMTP 主机 |
 | `SMTP_PORT` | `587` | SMTP 端口 |
 | `SMTP_SECURE` | `false` | `true` 表示 implicit TLS，通常用于 465 |
@@ -100,7 +102,7 @@ Control 密码哈希和 Session 摘要保存在数据卷的 `control-auth.json`�
 - 已有当天 roll 时会复用结果，不会重新生成数字。
 - RNGdle roll 失败按 `RETRY_MINUTES` 重试，默认 30 分钟。
 - 邮件发送失败只重试投递，按 `EMAIL_RETRY_MINUTES` 重试，默认 1 分钟。
-- 浏览器会话失效时暂停任务，认证完成后恢复。
+- 登录会话失效时暂停任务，认证完成后恢复。
 
 手动执行一次时，先停止常驻服务：
 
@@ -109,6 +111,22 @@ docker compose stop rngdle
 docker compose --profile tools run --rm --service-ports once
 docker compose start rngdle
 ```
+
+## 自动作诗
+
+在 `.env` 配置 `llm_endpoint`、`llm_api_key`、`llm_model`，并设置 `POEM_ENABLED=true` 后重启。默认使用 DeepSeek Flash，未启用时保留原每日流程。启用后顺序为 roll → 作诗并确认保存 → 结果邮件；作诗失败每 5 分钟重试，已有诗歌不会覆盖。
+
+```dotenv
+POEM_ENABLED=true
+POEM_RETRY_MINUTES=5
+llm_endpoint=https://api.deepseek.com
+llm_api_key=
+llm_model=deepseek-flash
+```
+
+`pnpm poem:inspect` 输出当天 Word Bank、徽章词与实际 prompt；`pnpm poem` 为已经存在的今日 roll 补诗，不生成新 roll，也不发送结果邮件。两者自动加载本地 `.env`。不要与使用同一数据目录的常驻服务同时启动。
+
+接口协议、词块次数和变形规则、重试行为及 Docker 操作见 [Compose Poem 文档](docs/rngdle-poem.md)。
 
 ## 更新与数据
 
@@ -121,7 +139,7 @@ docker compose up -d --build rngdle
 
 named volume `rngdle_automation_rngdle-data` 保存：
 
-- `browser-profile/`：登录 cookies 和 Playwright 会话
+- `cookies.json`：HTTP 登录 Cookie（兼容现有远端部署格式）
 - `state.json`：每日结果、邮件状态和重试记录
 - `settings.json`：Control 的运行时配置
 - `control-auth.json`：Control 密码哈希和 Session
@@ -134,6 +152,8 @@ docker compose restart rngdle
 ```
 
 备份数据卷前请确认其中包含登录 cookies 和 SMTP 密钥。不要将 Control 直接暴露到公网，远程访问请使用 SSH tunnel 或私有 HTTPS。
+
+当前镜像基于 `node:22-bookworm-slim`，运行与测试均不需要浏览器。已有 HTTP 部署可直接沿用 `cookies.json`；只有旧浏览器目录的部署需要通过 Authentication 重新提交一次 magic link。
 
 ## 本地开发
 

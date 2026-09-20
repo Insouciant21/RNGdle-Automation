@@ -4,5 +4,4 @@ data
 docs
 config/config.yaml
 .env
-playwright-report
 test-results

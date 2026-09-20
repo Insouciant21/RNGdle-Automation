@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/playwright:v1.62.0-noble
+FROM node:22-bookworm-slim
 
 ENV NODE_ENV=production \
     CONFIG_PATH=/app/config/default.yaml

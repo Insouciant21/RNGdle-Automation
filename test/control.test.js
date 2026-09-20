@@ -36,7 +36,7 @@ test("control APIs expose operations without exposing secrets", async (context) 
     timezone: "Asia/Shanghai",
     schedule: { time: "08:02", retryMinutes: 30, pollSeconds: 30 },
     rngdle: { baseUrl: "https://www.rngdle.com", email: "player@example.com" },
-    browser: { timeoutMs: 45_000 },
+    http: { timeoutMs: 45_000 },
     control: { port: 0, publicUrl: "http://localhost:3000", initialPassword: "test-control-password", sessionDays: 7, cookieSecure: false },
     smtp: {
       host: "smtp.example.com",

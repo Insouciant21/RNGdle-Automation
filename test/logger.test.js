@@ -24,3 +24,10 @@ test("recent logs are structured and recursively redact sensitive fields", () =>
   assert.deepEqual(entry.fields.changed, ["scheduleTime"]);
   assert.equal(entry.fields.request.headers.authorization, "[redacted]");
 });
+
+test("LLM credentials are redacted from nested structured logs", () => {
+  log("info", "LLM config", { llm: { apiKey: "private", model: "deepseek-flash" }, llm_api_key: "private", LLM_API_KEY: "private" });
+  const [entry] = getRecentLogs({ limit: 1 });
+  assert.doesNotMatch(JSON.stringify(entry), /private/);
+  assert.equal(entry.fields.llm.model, "deepseek-flash");
+});

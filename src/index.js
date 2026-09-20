@@ -6,8 +6,10 @@ import { errorSummary, log } from "./logger.js";
 import { waitForInteractiveAuthentication } from "./rngdle.js";
 import { isWorkflowDue, localParts } from "./schedule.js";
 import { loadRuntimeSettings } from "./settings.js";
-import { readState } from "./state.js";
+import { acquireLock, readState } from "./state.js";
 import { runDailyWorkflow } from "./workflow.js";
+import { inspectPoem } from "./poem-http.js";
+import { buildPoemMessages } from "./poem.js";
 
 function sleep(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -64,15 +66,28 @@ async function main() {
   if (await loadRuntimeSettings(config)) {
     log("info", "Runtime settings loaded", { path: config.storage.settingsPath });
   }
+  if (command === "inspect-poem") {
+    const release = await acquireLock(config.storage.lockPath);
+    if (!release) throw new Error("A workflow is running; retry inspection later");
+    try {
+      const bank = await inspectPoem(config);
+      console.log(JSON.stringify({ ...bank, ...(bank.wordBank ? { messages: buildPoemMessages(bank) } : {}) }, null, 2));
+    } finally { await release(); }
+    return;
+  }
   const control = await createControlServer(config);
   try {
     if (command === "once") {
       await runOnce(config, control);
+    } else if (command === "poem") {
+      const now = new Date();
+      const { date } = localParts(now, config.timezone);
+      await runDailyWorkflow(config, date, now, control, { poemOnly: true });
     } else if (command === "rngdle") {
       await waitForInteractiveAuthentication(config, control);
       await runAutomation(config, control);
     } else {
-      throw new Error(`Unknown command: ${command}. Use once or rngdle.`);
+      throw new Error(`Unknown command: ${command}. Use once, rngdle, poem, or inspect-poem.`);
     }
   } finally {
     await control.close();

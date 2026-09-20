@@ -13,7 +13,7 @@ function sanitizedValue(value) {
   return Object.fromEntries(
     Object.entries(value).map(([key, nestedValue]) => [
       key,
-      /password|secret|token|cookie|authorization/i.test(key) ? "[redacted]" : sanitizedValue(nestedValue),
+      /password|secret|token|cookie|authorization|api[_-]?key/i.test(key) ? "[redacted]" : sanitizedValue(nestedValue),
     ]),
   );
 }

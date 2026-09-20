@@ -10,9 +10,8 @@ rngdle:
   baseUrl: "${RNGDLE_BASE_URL:-https://www.rngdle.com}"
   email: "${RNGDLE_EMAIL}"
 
-browser:
-  headless: "${BROWSER_HEADLESS:-true}"
-  timeoutMs: "${BROWSER_TIMEOUT_MS:-45000}"
+http:
+  timeoutMs: "${HTTP_TIMEOUT_MS:-45000}"
 
 control:
   port: "${CONTROL_PORT:-3000}"
@@ -42,6 +41,20 @@ smtp:
 mail:
   fromName: "${MAIL_FROM_NAME:-RNGdle Today}"
   subjectPrefix: "${MAIL_SUBJECT_PREFIX:-[RNGdle]}"
+
+poem:
+  enabled: "${POEM_ENABLED:-false}"
+  retryMinutes: "${POEM_RETRY_MINUTES:-5}"
+
+llm:
+  endpoint: "${LLM_ENDPOINT:-https://api.deepseek.com}"
+  apiKey: "${LLM_API_KEY:-}"
+  model: "${LLM_MODEL:-deepseek-flash}"
+  timeoutMs: "${LLM_TIMEOUT_MS:-60000}"
+  maxTokens: "${LLM_MAX_TOKENS:-2048}"
+  maxAttempts: "${LLM_MAX_ATTEMPTS:-3}"
+  # DeepSeek extension; omitted from requests for other model families.
+  thinking: "${LLM_THINKING:-disabled}"
 
 storage:
   directory: ./data

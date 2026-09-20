@@ -73,6 +73,10 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
 
   const expandedEnv = {
     ...env,
+    LLM_ENDPOINT: env.llm_endpoint || env.LLM_ENDPOINT || "",
+    LLM_API_KEY: env.llm_api_key || env.LLM_API_KEY || "",
+    LLM_MODEL: env.llm_model || env.LLM_MODEL || "",
+    HTTP_TIMEOUT_MS: env.HTTP_TIMEOUT_MS || env.BROWSER_TIMEOUT_MS || "",
     SMTP_PASSWORD: env.SMTP_PASSWORD || env.SMTP_APP_PASSWORD || "",
     EMAIL_RETRY_MINUTES: env.EMAIL_RETRY_MINUTES || env.MAIL_RETRY_MINUTES || "",
   };
@@ -120,9 +124,8 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
       baseUrl: requiredString(raw.rngdle?.baseUrl ?? "https://www.rngdle.com", "rngdle.baseUrl").replace(/\/$/, ""),
       email: requiredString(raw.rngdle?.email, "rngdle.email"),
     },
-    browser: {
-      headless: booleanValue(raw.browser?.headless ?? true, "browser.headless"),
-      timeoutMs: positiveInteger(raw.browser?.timeoutMs ?? 45_000, "browser.timeoutMs"),
+    http: {
+      timeoutMs: positiveInteger(raw.http?.timeoutMs ?? raw.browser?.timeoutMs ?? 45_000, "http.timeoutMs"),
     },
     control: {
       port: positiveInteger(raw.control?.port ?? 3000, "control.port"),
@@ -152,15 +155,36 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
       fromName: requiredString(raw.mail?.fromName ?? "RNGdle Today", "mail.fromName"),
       subjectPrefix: requiredString(raw.mail?.subjectPrefix ?? "[RNGdle]", "mail.subjectPrefix"),
     },
+    poem: {
+      enabled: booleanValue(raw.poem?.enabled ?? false, "poem.enabled"),
+      retryMinutes: positiveInteger(raw.poem?.retryMinutes ?? 5, "poem.retryMinutes"),
+    },
+    llm: {
+      endpoint: requiredString(raw.llm?.endpoint ?? "https://api.deepseek.com", "llm.endpoint").replace(/\/$/, ""),
+      apiKey: optionalString(raw.llm?.apiKey),
+      model: requiredString(raw.llm?.model ?? "deepseek-flash", "llm.model"),
+      timeoutMs: positiveInteger(raw.llm?.timeoutMs ?? 60_000, "llm.timeoutMs"),
+      maxTokens: positiveInteger(raw.llm?.maxTokens ?? 2_048, "llm.maxTokens"),
+      maxAttempts: positiveInteger(raw.llm?.maxAttempts ?? 3, "llm.maxAttempts"),
+      thinking: requiredString(raw.llm?.thinking ?? "disabled", "llm.thinking"),
+    },
     storage: {
       directory: storageDirectory,
-      profileDirectory: path.join(storageDirectory, "browser-profile"),
+      cookiePath: path.join(storageDirectory, "cookies.json"),
       statePath: path.join(storageDirectory, "state.json"),
       settingsPath: path.join(storageDirectory, "settings.json"),
       controlAuthPath: path.join(storageDirectory, "control-auth.json"),
       lockPath: path.join(storageDirectory, "workflow.lock"),
     },
   };
+
+  const llmUrl = new URL(config.llm.endpoint);
+  if (!["http:", "https:"].includes(llmUrl.protocol) || llmUrl.username || llmUrl.password || llmUrl.search || llmUrl.hash) {
+    throw new Error("llm.endpoint must be an HTTP(S) API base URL without credentials, query, or fragment");
+  }
+  if (!new Set(["enabled", "disabled"]).has(config.llm.thinking)) throw new Error("llm.thinking must be enabled or disabled");
+  if (config.llm.maxAttempts > 5) throw new Error("llm.maxAttempts must be at most 5");
+  if (config.poem.enabled && !config.llm.apiKey) throw new Error("llm_api_key is required when POEM_ENABLED=true");
 
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: config.timezone }).format();

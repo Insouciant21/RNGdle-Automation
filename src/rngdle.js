@@ -1,13 +1,9 @@
-import { chromium } from "playwright";
 import { errorSummary, log } from "./logger.js";
 import { badgeRarity, cardRarity, normalizeRarity } from "./rarity.js";
+import { AuthenticationRequiredError, callServerAction, createRngdleSession, isRngdleUrl, responseText } from "./rngdle-http.js";
+import { discoverRngdleAssets } from "./rngdle-assets.js";
 
-export class AuthenticationRequiredError extends Error {
-  constructor(message = "RNGdle authentication is required") {
-    super(message);
-    this.name = "AuthenticationRequiredError";
-  }
-}
+export { AuthenticationRequiredError } from "./rngdle-http.js";
 
 function normalizeBadge(badge) {
   return {
@@ -48,120 +44,102 @@ export function normalizeHomePayload(payload) {
   };
 }
 
-async function launchContext(config, headless) {
-  return chromium.launchPersistentContext(config.storage.profileDirectory, {
-    headless,
-    viewport: { width: 1280, height: 900 },
-    locale: "en-US",
-    timezoneId: "UTC",
-    acceptDownloads: false,
-  });
+export async function fetchHome(session) {
+  const response = await session.request("/api/home", { headers: { Accept: "application/json" } });
+  if (response.status === 401 || response.status === 403) throw new AuthenticationRequiredError();
+  if (!response.ok) throw new Error(`RNGdle /api/home returned HTTP ${response.status}`);
+  return normalizeHomePayload(JSON.parse(await responseText(response)));
 }
 
-async function fetchHome(context, config) {
-  const response = await context.request.get(`${config.rngdle.baseUrl}/api/home`, {
-    timeout: config.browser.timeoutMs,
-    failOnStatusCode: false,
-  });
-  if (response.status() === 401 || response.status() === 403) {
-    throw new AuthenticationRequiredError();
-  }
-  if (!response.ok()) {
-    throw new Error(`RNGdle /api/home returned HTTP ${response.status()}`);
-  }
-  return normalizeHomePayload(await response.json());
+const utcDate = () => new Date().toISOString().slice(0, 10);
+function resultForDay(home, gameDate) {
+  if (utcDate() !== gameDate) throw new Error("RNGdle game day changed during the request; retry for the current day");
+  return { ...home.lastRoll, totalEp: home.totalEp, gameDate };
 }
 
-function delay(milliseconds) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+export async function getExistingDailyRoll(config) {
+  const gameDate = utcDate();
+  const home = await fetchHome(await createRngdleSession(config));
+  if (!home.lastRoll) throw new Error("No roll exists today; run the daily workflow before composing a poem");
+  return resultForDay(home, gameDate);
 }
 
 export async function getDailyRoll(config) {
-  const context = await launchContext(config, config.browser.headless);
-  context.setDefaultTimeout(config.browser.timeoutMs);
-  try {
-    const existing = await fetchHome(context, config);
-    if (existing.hasRolledToday && existing.lastRoll) {
-      log("info", "Today's RNGdle roll already exists; reusing it", { number: existing.lastRoll.number });
-      return { ...existing.lastRoll, totalEp: existing.totalEp };
-    }
-
-    const page = context.pages()[0] ?? (await context.newPage());
-    await page.goto(config.rngdle.baseUrl, { waitUntil: "domcontentloaded" });
-    const generateButton = page.getByRole("button", { name: /generate/i });
-    await generateButton.waitFor({ state: "visible" });
-    log("info", "Generating today's RNGdle number");
-    await generateButton.click();
-
-    const deadline = Date.now() + config.browser.timeoutMs;
-    while (Date.now() < deadline) {
-      await delay(1_000);
-      const current = await fetchHome(context, config);
-      if (current.hasRolledToday && current.lastRoll) {
-        return { ...current.lastRoll, totalEp: current.totalEp };
-      }
-    }
-    throw new Error("RNGdle did not expose the generated roll before the timeout");
-  } finally {
-    await context.close();
+  const session = await createRngdleSession(config);
+  const gameDate = utcDate();
+  const home = await fetchHome(session);
+  if (home.lastRoll) {
+    log("info", "Today's RNGdle roll already exists; reusing it", { number: home.lastRoll.number });
+    return resultForDay(home, gameDate);
   }
+  const { actions } = await discoverRngdleAssets(session, config.rngdle.baseUrl, { actionName: "rollDiceAction" });
+  if (utcDate() !== gameDate) throw new Error("RNGdle game day changed before rolling");
+  await callServerAction(session, actions.rollDiceAction, [], (value) => value.number !== null && Number.isFinite(Number(value.number)));
+  const deadline = Date.now() + config.http.timeoutMs;
+  do {
+    const current = await fetchHome(session);
+    if (current.lastRoll) return resultForDay(current, gameDate);
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  } while (Date.now() < deadline);
+  throw new Error("RNGdle did not expose the generated roll before the timeout");
+}
+
+export async function followAuthenticationLink(session, config, link) {
+  let url = new URL(link);
+  if (url.protocol !== "https:" || !isRngdleUrl(url, config.rngdle.baseUrl)) throw new Error("Enter a valid HTTPS RNGdle magic-link URL");
+  for (let redirects = 0; redirects < 10; redirects++) {
+    const response = await session.request(url);
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get("location");
+      await response.body?.cancel();
+      if (!location) throw new Error("RNGdle login redirect has no destination");
+      url = new URL(location, url);
+      if (!isRngdleUrl(url, config.rngdle.baseUrl)) throw new Error("RNGdle login redirected outside the trusted origin");
+      continue;
+    }
+    if (!response.ok) throw new Error(`RNGdle login returned HTTP ${response.status}`);
+    await responseText(response);
+    await fetchHome(session);
+    return;
+  }
+  throw new Error("RNGdle login redirected too many times");
 }
 
 export async function waitForInteractiveAuthentication(config, control = null) {
-  const context = await launchContext(config, true);
-  context.setDefaultTimeout(config.browser.timeoutMs);
-  const page = context.pages()[0] ?? (await context.newPage());
-  let navigating = false;
-
+  const session = await createRngdleSession(config);
+  try {
+    await fetchHome(session);
+    log("info", "Existing RNGdle HTTP authentication is valid");
+    control?.setStatus("authenticated", "Authenticated");
+    return;
+  } catch (error) {
+    if (!(error instanceof AuthenticationRequiredError)) throw error;
+  }
+  let verifying = false;
+  let authenticated = false;
   const onLine = async (line) => {
-    const candidate = line.trim();
-    if (!/^https:\/\//i.test(candidate) || navigating) return;
-    navigating = true;
+    const link = line.trim();
+    if (!/^https:\/\//i.test(link) || verifying || authenticated) return;
+    verifying = true;
     try {
-      await page.goto(candidate, { waitUntil: "domcontentloaded" });
+      await followAuthenticationLink(session, config, link);
+      authenticated = true;
+      log("info", "RNGdle HTTP authentication completed");
+      control?.setStatus("authenticated", "Authenticated");
     } catch (error) {
-      log("error", "Could not open the pasted authentication link", { error: errorSummary(error) });
-    } finally {
-      navigating = false;
-    }
+      log("error", "Could not verify the pasted authentication link", { error: errorSummary(error) });
+    } finally { verifying = false; }
   };
-
   process.stdin.setEncoding("utf8");
   process.stdin.on("data", onLine);
-  const removeLinkListener = control?.onLink(onLine);
+  const removeListener = control?.onLink(onLine);
   try {
-    await page.goto(config.rngdle.baseUrl, { waitUntil: "domcontentloaded" });
-    try {
-      await fetchHome(context, config);
-      log("info", "Existing RNGdle authentication is valid");
-      control?.setStatus("authenticated", "Authenticated");
-      return;
-    } catch (error) {
-      if (!(error instanceof AuthenticationRequiredError)) throw error;
-    }
-
-    log("info", "Interactive authentication is waiting", {
-      email: config.rngdle.email,
-      control: config.control.publicUrl,
-    });
     control?.setStatus("waiting", "Waiting for RNGdle login");
-    console.log(`Open ${config.control.publicUrl}, request a sign-in link on RNGdle, then submit the full magic-link URL.`);
-    console.log("When running interactively, you may also paste the full magic-link URL here and press Enter.");
-
-    while (true) {
-      try {
-        await fetchHome(context, config);
-        log("info", "RNGdle authentication completed");
-        control?.setStatus("authenticated", "Authenticated");
-        return;
-      } catch (error) {
-        if (!(error instanceof AuthenticationRequiredError)) throw error;
-      }
-      await delay(3_000);
-    }
+    log("info", "Waiting for RNGdle magic-link authentication", { control: config.control.publicUrl });
+    console.log(`Open ${config.control.publicUrl} and submit the RNGdle magic-link URL, or paste it here.`);
+    while (!authenticated) await new Promise((resolve) => setTimeout(resolve, 500));
   } finally {
-    removeLinkListener?.();
+    removeListener?.();
     process.stdin.off("data", onLine);
-    await context.close();
   }
 }

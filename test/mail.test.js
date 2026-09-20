@@ -49,3 +49,9 @@ test("mail templates escape untrusted display values", () => {
   assert.match(authentication.html, /&lt;script&gt;/);
   assert.deepEqual(authentication.from, { name: "RNGdle Today", address: "sender@example.com" });
 });
+
+test("saved poems appear in both mail formats with escaped HTML", () => {
+  const message = buildRollMessage(config, "2026-09-19", { number: 1, earnedEp: 1, totalEp: 1, badges: [], poem: "mountains <rise> & shine" });
+  assert.match(message.text, /Poem: mountains <rise> & shine/);
+  assert.match(message.html, /mountains &lt;rise&gt; &amp; shine/);
+});

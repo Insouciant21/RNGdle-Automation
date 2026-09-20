@@ -113,6 +113,7 @@ export function buildRollMessage(config, date, result) {
       <tr><td align="center" style="padding:14px 0 0;"><span style="display:inline-block;padding:6px 13px;border:1px solid ${rollPalette.border};border-radius:999px;background:${rollPalette.bg};font-family:${EMAIL_FONT};font-size:14px;line-height:18px;font-weight:600;color:${rollPalette.text};font-variant-numeric:tabular-nums;">${escapeHtml(earned)} EP</span></td></tr>
       <tr><td align="center" style="padding:10px 0 0;font-family:${EMAIL_FONT};font-size:16px;line-height:20px;font-weight:600;color:#4b5563;font-variant-numeric:tabular-nums;">${escapeHtml(total)} EP</td></tr>
       <tr><td align="center" style="padding:2px 0 32px;font-family:${EMAIL_FONT};font-size:10px;line-height:15px;color:#9ca3af;letter-spacing:.04em;text-transform:uppercase;">YOUR LIFETIME EP</td></tr>
+      ${result.poem ? `<tr><td align="center" style="padding:0 12px 28px;font-family:${EMAIL_FONT};font-size:17px;line-height:26px;font-style:italic;color:#4b5563;">${escapeHtml(result.poem)}</td></tr>` : ""}
       <tr><td align="center" style="padding:0 0 10px;font-family:${EMAIL_FONT};font-size:18px;line-height:24px;font-weight:700;color:#111827;">Badge Breakdown</td></tr>
       <tr><td align="center" style="padding:0 0 12px;font-family:${EMAIL_FONT};font-size:11px;line-height:16px;color:#4b5563;letter-spacing:.04em;text-transform:uppercase;">${badgeCountLabel}</td></tr>
       <tr><td><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">${badgeRows}</table></td></tr>
@@ -129,6 +130,7 @@ export function buildRollMessage(config, date, result) {
       `Number: ${result.number}`,
       `Earned EP: ${result.earnedEp}`,
       `Total EP: ${total}`,
+      ...(result.poem ? ["", `Poem: ${result.poem}`, ""] : []),
       "Badges:",
       ...(badgeLines.length
         ? badgeLines.map((line, index) => {

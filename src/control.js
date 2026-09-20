@@ -128,7 +128,7 @@ async function overviewPayload(config, status) {
   const latest = newestDay(state);
   const latestResult = newestDay(state, (day) => Boolean(day.result));
   const splitRetryState = latest
-    ? Object.hasOwn(latest.day, "nextRngdleRetryAt") || Object.hasOwn(latest.day, "nextEmailRetryAt")
+    ? ["nextRngdleRetryAt", "nextPoemRetryAt", "nextEmailRetryAt"].some((key) => Object.hasOwn(latest.day, key))
     : false;
   const legacyRetryAt = splitRetryState ? null : latest?.day.nextRetryAt ?? null;
   return {
@@ -140,6 +140,8 @@ async function overviewPayload(config, status) {
       retryMinutes: config.schedule.retryMinutes,
       rngdleRetryMinutes: config.schedule.retryMinutes,
       emailRetryMinutes: config.schedule.emailRetryMinutes ?? 1,
+      poemEnabled: config.poem?.enabled ?? false,
+      poemRetryMinutes: config.poem?.retryMinutes ?? 5,
     },
     rngdle: { email: config.rngdle.email, baseUrl: config.rngdle.baseUrl },
     mail: { from: config.smtp.from, to: [...config.smtp.to] },
@@ -149,6 +151,8 @@ async function overviewPayload(config, status) {
           status: latest.day.status,
           attempts: latest.day.attempts ?? 0,
           emailAttempts: latest.day.emailAttempts ?? 0,
+          poemAttempts: latest.day.poemAttempts ?? 0,
+          nextPoemRetryAt: latest.day.nextPoemRetryAt ?? null,
           nextRngdleRetryAt: splitRetryState ? latest.day.nextRngdleRetryAt ?? null : legacyRetryAt,
           nextEmailRetryAt: splitRetryState
             ? latest.day.nextEmailRetryAt ?? null
@@ -156,7 +160,9 @@ async function overviewPayload(config, status) {
               ? legacyRetryAt
               : null,
           nextRetryAt: splitRetryState
-            ? latest.day.status === "email_pending"
+            ? latest.day.status === "poem_pending"
+              ? latest.day.nextPoemRetryAt ?? null
+              : latest.day.status === "email_pending"
               ? latest.day.nextEmailRetryAt ?? null
               : latest.day.nextRngdleRetryAt ?? null
             : legacyRetryAt,
@@ -402,12 +408,12 @@ export async function createControlServer(
         requireCsrf();
         const { link } = await readJson(request);
         if (status.state !== "waiting") {
-          sendJson(response, 409, { message: "The browser is not currently waiting for authentication." });
+          sendJson(response, 409, { message: "The service is not currently waiting for authentication." });
         } else if (!isAllowedAuthenticationLink(link, config.rngdle.baseUrl)) {
           sendJson(response, 400, { message: "Enter a valid HTTPS RNGdle magic-link URL." });
         } else {
           for (const listener of linkListeners) listener(link);
-          sendJson(response, 202, { message: "Link sent to the persistent browser." });
+          sendJson(response, 202, { message: "Sign-in link queued for HTTP verification." });
         }
       } else {
         sendJson(response, 404, { message: "Not found" });

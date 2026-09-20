@@ -73,3 +73,10 @@ test("email-pending days use the email retry timestamp", () => {
 test("nextRetryAt adds the configured interval", () => {
   assert.equal(nextRetryAt(new Date("2026-07-29T00:02:00Z"), 30), "2026-07-29T00:32:00.000Z");
 });
+
+test("poem-pending days respect their own retry timestamp", () => {
+  const base = { timezone: "Asia/Shanghai", scheduleTime: "08:02", now: new Date("2026-09-19T01:00:00Z") };
+  const dayState = { status: "poem_pending", lastAttemptAt: "2026-09-19T00:50:00Z", nextPoemRetryAt: "2026-09-19T01:05:00Z", nextEmailRetryAt: "2026-09-19T00:51:00Z" };
+  assert.equal(isWorkflowDue({ ...base, dayState }), false);
+  assert.equal(isWorkflowDue({ ...base, dayState: { ...dayState, nextPoemRetryAt: "2026-09-19T00:55:00Z" } }), true);
+});

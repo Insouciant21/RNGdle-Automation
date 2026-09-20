@@ -40,7 +40,9 @@ export function isWorkflowDue({ now, timezone, scheduleTime, dayState }) {
   if (!dayState?.lastAttemptAt) {
     return true;
   }
-  const retryAt = dayState.status === "email_pending"
+  const retryAt = dayState.status === "poem_pending"
+    ? dayState.nextPoemRetryAt ?? dayState.nextRetryAt
+    : dayState.status === "email_pending"
     ? dayState.nextEmailRetryAt ?? dayState.nextRetryAt
     : dayState.nextRngdleRetryAt ?? dayState.nextRetryAt;
   return !retryAt || now >= new Date(retryAt);

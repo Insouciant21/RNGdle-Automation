@@ -10,7 +10,7 @@ function configFor(directory) {
     timezone: "Asia/Shanghai",
     schedule: { time: "08:02", retryMinutes: 30, emailRetryMinutes: 1, pollSeconds: 30 },
     rngdle: { email: "player@example.com" },
-    browser: { timeoutMs: 45_000 },
+    http: { timeoutMs: 45_000 },
     control: { publicUrl: "http://localhost:3000" },
     smtp: {
       host: "smtp.example.com",
@@ -71,4 +71,12 @@ test("runtime settings reject invalid schedule and recipient values", () => {
   assert.throws(() => validateSettings({ ...publicSettings(config), scheduleTime: "25:00" }, config), /HH:mm/);
   assert.throws(() => validateSettings({ ...publicSettings(config), mailTo: "not-an-email" }, config), /email/);
   assert.throws(() => validateSettings({ ...publicSettings(config), emailRetryMinutes: 0 }, config), /emailRetryMinutes/);
+});
+
+test("legacy browser timeout settings migrate to HTTP timeout without a browser dependency", () => {
+  const config = configFor("/tmp");
+  const migrated = validateSettings({ browserTimeoutMs: 60_000 }, config);
+  assert.equal(migrated.httpTimeoutMs, 60_000);
+  assert.equal("browserTimeoutMs" in migrated, false);
+  assert.equal(validateSettings({ httpTimeoutMs: 30_000, browserTimeoutMs: 60_000 }, config).httpTimeoutMs, 30_000);
 });

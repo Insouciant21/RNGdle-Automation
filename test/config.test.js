@@ -79,3 +79,28 @@ test("rejects password SMTP configuration without a credential", async (context)
     /smtp\.password is required/,
   );
 });
+
+test("LLM lowercase environment variables take precedence and enabled poetry requires a key", async () => {
+  const env = { RNGDLE_EMAIL: "player@example.com", SMTP_USER: "sender@example.com", SMTP_PASSWORD: "smtp-secret", MAIL_TO: "receiver@example.com" };
+  const defaults = await loadConfig("config/default.yaml", env);
+  assert.equal(defaults.poem.enabled, false);
+  assert.equal(defaults.llm.model, "deepseek-flash");
+  await assert.rejects(loadConfig("config/default.yaml", { ...env, POEM_ENABLED: "true" }), /llm_api_key/);
+  const configured = await loadConfig("config/default.yaml", { ...env, POEM_ENABLED: "true", llm_api_key: "lowercase-key", LLM_API_KEY: "uppercase-key", llm_endpoint: "https://example.com/v1/", llm_model: "my-model" });
+  assert.equal(configured.llm.apiKey, "lowercase-key");
+  assert.equal(configured.llm.endpoint, "https://example.com/v1");
+  assert.equal(configured.llm.model, "my-model");
+  for (const extra of [{ llm_endpoint: "file:///tmp/model" }, { llm_endpoint: "https://user:password@example.com" }, { LLM_MAX_ATTEMPTS: "6" }, { LLM_THINKING: "maybe" }]) {
+    await assert.rejects(loadConfig("config/default.yaml", { ...env, ...extra }));
+  }
+});
+
+test("HTTP timeout accepts the legacy environment alias and cookies use the existing data directory", async () => {
+  const env = { RNGDLE_EMAIL: "player@example.com", SMTP_USER: "sender@example.com", SMTP_PASSWORD: "smtp-secret", MAIL_TO: "receiver@example.com", BROWSER_TIMEOUT_MS: "60000" };
+  const legacy = await loadConfig("config/default.yaml", env);
+  assert.equal(legacy.http.timeoutMs, 60_000);
+  assert.equal("browser" in legacy, false);
+  assert.equal("profileDirectory" in legacy.storage, false);
+  assert.equal(legacy.storage.cookiePath, path.join(legacy.storage.directory, "cookies.json"));
+  assert.equal((await loadConfig("config/default.yaml", { ...env, HTTP_TIMEOUT_MS: "30000" })).http.timeoutMs, 30_000);
+});

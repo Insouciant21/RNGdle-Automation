@@ -72,7 +72,7 @@ export function publicSettings(config) {
     emailRetryMinutes: config.schedule.emailRetryMinutes ?? 1,
     pollSeconds: config.schedule.pollSeconds,
     rngdleEmail: config.rngdle.email,
-    browserTimeoutMs: config.browser.timeoutMs,
+    httpTimeoutMs: config.http.timeoutMs,
     controlPublicUrl: config.control.publicUrl,
     smtpHost: config.smtp.host,
     smtpPort: config.smtp.port,
@@ -108,9 +108,9 @@ export function validateSettings(input, config) {
     ),
     pollSeconds: integerValue(input.pollSeconds ?? config.schedule.pollSeconds, "pollSeconds", 5, 3_600),
     rngdleEmail: emailValue(input.rngdleEmail ?? config.rngdle.email, "rngdleEmail"),
-    browserTimeoutMs: integerValue(
-      input.browserTimeoutMs ?? config.browser.timeoutMs,
-      "browserTimeoutMs",
+    httpTimeoutMs: integerValue(
+      input.httpTimeoutMs ?? input.browserTimeoutMs ?? config.http.timeoutMs,
+      "httpTimeoutMs",
       5_000,
       300_000,
     ),
@@ -143,7 +143,7 @@ export function applySettings(config, settings) {
   config.schedule.emailRetryMinutes = settings.emailRetryMinutes;
   config.schedule.pollSeconds = settings.pollSeconds;
   config.rngdle.email = settings.rngdleEmail;
-  config.browser.timeoutMs = settings.browserTimeoutMs;
+  config.http.timeoutMs = settings.httpTimeoutMs;
   config.control.publicUrl = settings.controlPublicUrl;
   config.smtp.host = settings.smtpHost;
   config.smtp.port = settings.smtpPort;
