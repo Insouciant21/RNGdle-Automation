@@ -63,11 +63,13 @@ config/default.yaml + .env
 ### 启动
 
 ```bash
-docker compose up -d rngdle
+docker compose up -d --build rngdle
 docker compose logs -f rngdle
 ```
 
 打开 [http://localhost:3000](http://localhost:3000)。Control 默认只绑定 `127.0.0.1`。
+
+现有远端部署在 Compose 中使用 `0.0.0.0:38080:3000`，可通过 `http://服务器地址:38080` 或宿主机反向代理访问；更新时保留部署环境的端口配置。
 
 ### 首次设置与认证
 

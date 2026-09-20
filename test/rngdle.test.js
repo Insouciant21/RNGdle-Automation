@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AuthenticationRequiredError, normalizeHomePayload } from "../src/rngdle.js";
+import { callServerAction } from "../src/rngdle-http.js";
+
+test("parses the authenticated Next.js roll action response", async () => {
+  const session = { request: async () => new Response('0:{"a":"$@1"}\n1:{"number":123456,"badges":[],"totalScore":42,"recorded":true}\n') };
+  assert.deepEqual(
+    await callServerAction(session, "roll-action", [], (value) => Number.isFinite(value.number)),
+    { number: 123456, badges: [], totalScore: 42, recorded: true },
+  );
+});
 
 test("normalizes the current roll and badge fields from /api/home", () => {
   assert.deepEqual(
