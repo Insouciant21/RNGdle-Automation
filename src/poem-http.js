@@ -1,4 +1,4 @@
-import { generatePoem, POEM_RULES, renderPoem, validatePoemSelection } from "./poem.js";
+import { generatePoem, POEM_QUALITY_VERSION, POEM_RULES, renderPoem, validatePoemSelection } from "./poem.js";
 import { fetchHome } from "./rngdle.js";
 import { callServerAction, createRngdleSession } from "./rngdle-http.js";
 import { buildWordBank, discoverRngdleAssets } from "./rngdle-assets.js";
@@ -34,7 +34,7 @@ export async function composeDailyPoem(config, result, { draft = null, onDraft =
   if (home.lastRoll.poem) return { text: home.lastRoll.poem, reused: true, gameDate };
   const { bank, actionId } = await readBank(session, config, home.lastRoll);
   const signature = JSON.stringify(bank.wordBank);
-  if (draft?.number !== result.number || draft?.gameDate !== gameDate || draft?.bankSignature !== signature) {
+  if (draft?.qualityVersion !== POEM_QUALITY_VERSION || draft?.number !== result.number || draft?.gameDate !== gameDate || draft?.bankSignature !== signature) {
     draft = { ...await generate(config, bank), number: result.number, gameDate, bankSignature: signature };
     await onDraft(draft);
   }

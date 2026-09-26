@@ -43,7 +43,7 @@ async function fixture(context) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   context.after(() => new Promise((resolve) => server.close(resolve)));
   const config = { http: { timeoutMs: 5000 }, rngdle: { baseUrl: `http://127.0.0.1:${server.address().port}` }, storage: { directory, cookiePath: path.join(directory, "cookies.json") } };
-  const generated = { tiles: [{ id: "MOUNTAIN_0", variant: "mountains" }, { id: "HELIUM_0" }, { id: "MOUNTAIN_5" }], text: "mountains rise!", model: "test" };
+  const generated = { tiles: [{ id: "MOUNTAIN_0", variant: "mountains" }, { id: "HELIUM_0" }, { id: "MOUNTAIN_5" }], text: "mountains rise!", model: "test", qualityVersion: 1 };
   const options = { generate: async () => generated, onDraft: async (draft) => { state.savedDraft = draft; } };
   return { config, state, options };
 }
@@ -133,4 +133,31 @@ test("HTTP magic-link redirects are followed only within trusted RNGdle origins"
   assert.equal(visited.length, 3);
   session.request = async () => new Response(null, { status: 302, headers: { location: "https://external.invalid/" } });
   await assert.rejects(followAuthenticationLink(session, config, "https://www.rngdle.com/verify"), /trusted origin/);
+});
+
+
+test("legacy drafts without semantic approval are regenerated before submission", async (context) => {
+  const { config, state, options } = await fixture(context);
+  state.rejected = true;
+  await assert.rejects(composeDailyPoem(config, state.roll, options), /Invalid tile/);
+  const legacyDraft = { ...state.savedDraft };
+  delete legacyDraft.qualityVersion;
+  state.rejected = false;
+  let regenerated = false;
+  await composeDailyPoem(config, state.roll, { ...options, draft: legacyDraft, generate: async (...args) => {
+    regenerated = true;
+    return options.generate(...args);
+  } });
+  assert.equal(regenerated, true);
+  assert.equal(state.savedDraft.qualityVersion, 1);
+});
+
+test("quality rejection cannot persist a draft or submit a poem", async (context) => {
+  const { config, state } = await fixture(context);
+  await assert.rejects(composeDailyPoem(config, state.roll, {
+    generate: async () => { throw new Error("Poem quality review rejected the candidate"); },
+    onDraft: () => assert.fail("unapproved draft must not be persisted"),
+  }), /quality review rejected/);
+  assert.equal(state.posts.length, 0);
+  assert.equal(state.roll.poem, null);
 });
