@@ -2,6 +2,8 @@ node_modules/
 data/
 config/config.yaml
 .env
+.env.*
+!.env.example
 test-results/
 npm-debug.log*
 .astro/
