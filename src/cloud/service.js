@@ -12,6 +12,7 @@ import { errorSummary, log, withLogSink } from "../logger.js";
 import { workerConfig } from "./config.js";
 import { nextWake } from "./schedule.js";
 import { advanceWorkflow } from "./workflow.js";
+import { createReturnLikeState, processReturnLikes } from "../rngdle-likes.js";
 
 const EMPTY_STATE = () => ({ version: 1, days: {} });
 const json = (data, status = 200, headers = {}) => Response.json(data, { status, headers: { "Cache-Control": "no-store", ...headers } });
@@ -72,8 +73,32 @@ export class AutomationService {
   async schedule() {
     const meta = await this.meta();
     if (meta.paused || meta.authenticated === false || !this.env.CONFIG_JSON) return this.storage.deleteAlarm();
-    const at = nextWake(await this.config(), await this.state());
+    const at = nextWake(await this.config(), await this.state(), new Date(), await this.storage.get("social"));
     await this.storage.setAlarm(at);
+  }
+
+  async returnLikes(config, now = new Date()) {
+    if (!config.likes?.enabled) return null;
+    const current = await this.storage.get("social");
+    const lastChecked = Date.parse(current?.lastCheckedAt);
+    const interval = (config.likes.pollMinutes ?? 10) * 60_000;
+    if (Number.isFinite(lastChecked) && lastChecked + interval > now.getTime()) return null;
+    const social = current ?? createReturnLikeState(now);
+    const session = await createRngdleSession(config);
+    const process = this.dependencies.processReturnLikes ?? processReturnLikes;
+    try {
+      const result = await process(config, social, {
+        ...(this.dependencies.returnLikeDependencies ?? {}),
+        session,
+        now,
+      });
+      return result;
+    } catch (error) {
+      log("error", "RNGdle return-like check failed", { error: errorSummary(error) });
+      return null;
+    } finally {
+      await this.storage.put("social", social);
+    }
   }
 
   async tick() {
@@ -96,6 +121,7 @@ export class AutomationService {
             await this.storage.put("meta", meta);
           }
         }
+        await this.returnLikes(config, now);
       } finally { await this.schedule(); }
     });
   }
@@ -181,7 +207,9 @@ export class AutomationService {
         const input = await readJson(request);
         if (input.smtpPort === 25 || input.smtpPort === "25") fail("Workers cannot connect to SMTP port 25");
         input.controlPublicUrl = this.env.CONTROL_PUBLIC_URL ?? config.control.publicUrl;
+        const likesWereEnabled = config.likes?.enabled === true;
         const settings = await saveRuntimeSettings(config, input);
+        if (config.likes?.enabled && !likesWereEnabled) await this.storage.delete("social");
         await this.schedule();
         log("info", "Control settings updated");
         return json({ message: "Settings saved and applied.", settings });

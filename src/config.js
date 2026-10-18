@@ -159,6 +159,12 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
       enabled: booleanValue(raw.poem?.enabled ?? false, "poem.enabled"),
       retryMinutes: positiveInteger(raw.poem?.retryMinutes ?? 5, "poem.retryMinutes"),
     },
+    likes: {
+      enabled: booleanValue(raw.likes?.enabled ?? false, "likes.enabled"),
+      pollMinutes: positiveInteger(raw.likes?.pollMinutes ?? 10, "likes.pollMinutes"),
+      maxPerDay: positiveInteger(raw.likes?.maxPerDay ?? 10, "likes.maxPerDay"),
+      lookbackDays: positiveInteger(raw.likes?.lookbackDays ?? 7, "likes.lookbackDays"),
+    },
     llm: {
       endpoint: requiredString(raw.llm?.endpoint ?? "https://api.deepseek.com", "llm.endpoint").replace(/\/$/, ""),
       apiKey: optionalString(raw.llm?.apiKey),

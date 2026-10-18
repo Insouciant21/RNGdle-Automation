@@ -20,6 +20,7 @@ export const fixtureConfig = {
   smtp: { host: "smtp.example.com", port: 465, secure: true, requireTls: false, authMode: "password", password: "smtp-private", username: "sender@example.com", from: "sender@example.com", to: ["receiver@example.com"] },
   mail: { fromName: "RNGdle Today", subjectPrefix: "[RNGdle]" },
   poem: { enabled: true, retryMinutes: 5 },
+  likes: { enabled: false, pollMinutes: 10, maxPerDay: 10, lookbackDays: 7 },
   llm: { endpoint: "https://api.deepseek.com", apiKey: "llm-private", model: "deepseek-flash", maxAttempts: 1, maxTokens: 2048, timeoutMs: 60000, thinking: "disabled" },
 };
 

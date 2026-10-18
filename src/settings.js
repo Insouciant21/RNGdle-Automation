@@ -71,6 +71,10 @@ export function publicSettings(config) {
     rngdleRetryMinutes: config.schedule.retryMinutes,
     emailRetryMinutes: config.schedule.emailRetryMinutes ?? 1,
     pollSeconds: config.schedule.pollSeconds,
+    returnLikesEnabled: config.likes?.enabled ?? false,
+    returnLikesPollMinutes: config.likes?.pollMinutes ?? 10,
+    returnLikesMaxPerDay: config.likes?.maxPerDay ?? 10,
+    returnLikesLookbackDays: config.likes?.lookbackDays ?? 7,
     rngdleEmail: config.rngdle.email,
     httpTimeoutMs: config.http.timeoutMs,
     controlPublicUrl: config.control.publicUrl,
@@ -107,6 +111,25 @@ export function validateSettings(input, config) {
       1_440,
     ),
     pollSeconds: integerValue(input.pollSeconds ?? config.schedule.pollSeconds, "pollSeconds", 5, 3_600),
+    returnLikesEnabled: booleanValue(input.returnLikesEnabled ?? config.likes?.enabled ?? false, "returnLikesEnabled"),
+    returnLikesPollMinutes: integerValue(
+      input.returnLikesPollMinutes ?? config.likes?.pollMinutes ?? 10,
+      "returnLikesPollMinutes",
+      5,
+      1_440,
+    ),
+    returnLikesMaxPerDay: integerValue(
+      input.returnLikesMaxPerDay ?? config.likes?.maxPerDay ?? 10,
+      "returnLikesMaxPerDay",
+      1,
+      50,
+    ),
+    returnLikesLookbackDays: integerValue(
+      input.returnLikesLookbackDays ?? config.likes?.lookbackDays ?? 7,
+      "returnLikesLookbackDays",
+      1,
+      30,
+    ),
     rngdleEmail: emailValue(input.rngdleEmail ?? config.rngdle.email, "rngdleEmail"),
     httpTimeoutMs: integerValue(
       input.httpTimeoutMs ?? input.browserTimeoutMs ?? config.http.timeoutMs,
@@ -142,6 +165,11 @@ export function applySettings(config, settings) {
   config.schedule.retryMinutes = settings.rngdleRetryMinutes;
   config.schedule.emailRetryMinutes = settings.emailRetryMinutes;
   config.schedule.pollSeconds = settings.pollSeconds;
+  config.likes ??= {};
+  config.likes.enabled = settings.returnLikesEnabled;
+  config.likes.pollMinutes = settings.returnLikesPollMinutes;
+  config.likes.maxPerDay = settings.returnLikesMaxPerDay;
+  config.likes.lookbackDays = settings.returnLikesLookbackDays;
   config.rngdle.email = settings.rngdleEmail;
   config.http.timeoutMs = settings.httpTimeoutMs;
   config.control.publicUrl = settings.controlPublicUrl;

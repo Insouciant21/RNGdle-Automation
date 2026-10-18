@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createRngdleSession, callServerAction } from "../src/rngdle-http.js";
-import { parseWordData, buildWordBank } from "../src/rngdle-assets.js";
+import { parseWordData, buildWordBank, discoverServerAction, findServerAction } from "../src/rngdle-assets.js";
 import { followAuthenticationLink, getDailyRoll } from "../src/rngdle.js";
 import { composeDailyPoem, inspectPoem } from "../src/poem-http.js";
 
@@ -61,6 +61,19 @@ test("literal parser reconstructs deterministic official IDs without executing d
   assert.notDeepEqual(buildWordBank(data, badges, 123456), bank);
   assert.throws(() => parseWordData(wordSource.replace("1664525", "1664526")), /algorithm changed/);
   assert.throws(() => parseWordData(wordSource.replace('"mountains"', 'process.exit()')));
+});
+
+test("social server actions are discovered through lazily referenced script chunks", async () => {
+  const baseUrl = "https://rngdle.test";
+  const session = { request: async (candidate) => {
+    const url = new URL(candidate, baseUrl);
+    if (url.pathname === "/u/friend") return new Response('<script src="/_next/static/chunks/root.js"></script>');
+    if (url.pathname === "/_next/static/chunks/root.js") return new Response('import("/_next/static/chunks/lazy.js")');
+    if (url.pathname === "/_next/static/chunks/lazy.js") return new Response('var heart=(0,S.createServerReference)("abc123",S.callServer,void 0,S.findSourceMapURL,"toggleHeart")');
+    return new Response("missing", { status: 404 });
+  } };
+  assert.equal(findServerAction('(0,S.createServerReference)("abc123",S.callServer,void 0,S.findSourceMapURL,"toggleHeart")', "toggleHeart"), "abc123");
+  assert.equal(await discoverServerAction(session, baseUrl, { pagePath: "/u/friend", actionName: "toggleHeart" }), "abc123");
 });
 
 test("Durable Object cookie storage works without any filesystem paths", async (context) => {

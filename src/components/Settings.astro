@@ -14,6 +14,18 @@
           </div>
         </section>
         <section class="settings-group">
+          <div class="settings-heading"><h2>Return likes</h2><p>Reciprocal hearts from new notifications</p></div>
+          <div class="form-grid">
+            <div class="form-field full">
+              <label class="check"><input id="return-likes-enabled" type="checkbox">Return a heart for new likes</label>
+              <p class="password-help">The first check records existing notifications as a baseline. New likes from other users receive one heart on their latest recent roll.</p>
+            </div>
+            <div class="form-field"><label class="field-label" for="return-likes-poll-minutes">Check interval (minutes)</label><input class="input" id="return-likes-poll-minutes" type="number" min="5" max="1440" required></div>
+            <div class="form-field"><label class="field-label" for="return-likes-max-per-day">Maximum per day</label><input class="input" id="return-likes-max-per-day" type="number" min="1" max="50" required></div>
+            <div class="form-field"><label class="field-label" for="return-likes-lookback-days">Recent roll window (days)</label><input class="input" id="return-likes-lookback-days" type="number" min="1" max="30" required></div>
+          </div>
+        </section>
+        <section class="settings-group">
           <div class="settings-heading"><h2>Delivery</h2><p>Account and recipients</p></div>
           <div class="form-grid">
             <div class="form-field"><label class="field-label" for="rngdle-email">RNGdle email</label><input class="input" id="rngdle-email" type="email" required></div>

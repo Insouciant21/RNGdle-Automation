@@ -14,6 +14,7 @@ Astro 控制台与 Cloudflare Workers 每日自动化服务。默认每天按配
 - Durable Object Alarm 调度 `roll → poem → email`，每个阶段独立持久化和重试
 - 写操作与 Alarm 串行执行，对象重启后从已完成阶段恢复
 - 登录失效时暂停任务并提示重新认证，提交 magic link 后恢复
+- 可选回赞：轮询新的 `heart_received` 通知，为对方最近 7 天内的 roll 回点一次心；首启建立基线，默认关闭
 - 保留可选 DeepSeek / OpenAI 兼容 LLM 作诗，生成后先做词块与质量校验再提交
 
 ## 本地开发
@@ -36,6 +37,7 @@ pnpm build
 - 默认调度：上海时间 `08:02`，可在 Settings 修改时区和时间
 - RNGdle 失败默认 30 分钟重试，诗歌 5 分钟，邮件 1 分钟
 - 已完成日期直接跳过；已有 roll 或诗歌会复用，不重复生成或提交
+- 回赞默认每 10 分钟检查一次，每天最多 10 次；同一用户的多个通知只回赞一次，已有自己的心或 roll 过旧时跳过
 - SMTP 密码在 Settings 中留空表示保留，且不会通过 API 返回
 - Control Session 使用 Secure、HttpOnly Cookie，写操作要求同源和 CSRF Token
 - SMTP 接受邮件后、状态保存前中断仍可能导致重复投递，系统不承诺严格一次发送

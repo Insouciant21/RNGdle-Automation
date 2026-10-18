@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { AutomationService } from "../src/cloud/service.js";
 import { advanceWorkflow } from "../src/cloud/workflow.js";
-import { nextWake } from "../src/cloud/schedule.js";
+import { nextReturnLikeWake, nextWake } from "../src/cloud/schedule.js";
 import { AuthenticationRequiredError } from "../src/rngdle.js";
 import { localParts } from "../src/schedule.js";
 
@@ -86,6 +86,17 @@ test("alarms respect daily schedule, stage retry deadlines, and completed days",
   assert.equal(nextWake(config, state, new Date("2026-10-18T00:03:00Z")), Date.parse("2026-10-18T01:00:00Z"));
 });
 
+test("return-like polling chooses an independent short alarm and resets after the enabled baseline", () => {
+  const { config } = setup();
+  config.likes = { enabled: true, pollMinutes: 10, maxPerDay: 10, lookbackDays: 7 };
+  const now = new Date("2026-10-18T12:00:00Z");
+  assert.equal(nextReturnLikeWake(config, null, now), now.getTime() + 1000);
+  assert.equal(nextReturnLikeWake(config, { lastCheckedAt: "2026-10-18T11:55:00Z" }, now), Date.parse("2026-10-18T12:05:00Z"));
+  assert.ok(nextWake(config, empty(), now, { lastCheckedAt: "2026-10-18T11:55:00Z" }) <= Date.parse("2026-10-18T12:05:00Z"));
+  config.likes.enabled = false;
+  assert.equal(nextReturnLikeWake(config, null, now), Infinity);
+});
+
 test("alarms schedule across DST using real timezone instants", () => {
   const { config } = setup(); config.timezone = "America/New_York"; config.schedule.time = "08:02";
   const state = { version: 1, days: { "2026-03-07": { status: "success" } } };
@@ -143,6 +154,27 @@ test("concurrent alarms serialize and never generate a second roll", async () =>
   assert.equal(rolls, 1);
   assert.equal((await storage.get("state")).days[localParts(new Date(), config.timezone).date].status, "success");
   assert.ok(await storage.getAlarm());
+});
+
+test("an alarm runs the return-like workflow without rerunning a completed daily roll", async () => {
+  const { storage } = setup();
+  const config = structuredClone(fixtureConfig);
+  config.likes = { enabled: true, pollMinutes: 10, maxPerDay: 10, lookbackDays: 7 };
+  const today = localParts(new Date(), config.timezone).date;
+  await storage.put("state", { version: 1, days: { [today]: { status: "success" } } });
+  await storage.put("meta", { paused: false, importedAt: new Date().toISOString() });
+  let calls = 0;
+  const service = new AutomationService(storage, { CONFIG_JSON: JSON.stringify(config) }, {
+    getRoll: () => assert.fail("must not reroll a completed day"),
+    processReturnLikes: async (_config, social) => {
+      calls++;
+      social.lastCheckedAt = new Date().toISOString();
+      return { liked: 0, skipped: 0 };
+    },
+  });
+  await service.tick();
+  assert.equal(calls, 1);
+  assert.ok((await storage.get("social")).lastCheckedAt);
 });
 
 test("failed login limits remain enforced after object restart", async () => {

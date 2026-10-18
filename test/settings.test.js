@@ -37,6 +37,10 @@ test("runtime settings persist, hot-apply, and never expose the password", async
     scheduleTime: "09:15",
     rngdleRetryMinutes: 45,
     emailRetryMinutes: 2,
+    returnLikesEnabled: true,
+    returnLikesPollMinutes: 15,
+    returnLikesMaxPerDay: 5,
+    returnLikesLookbackDays: 3,
     mailFromName: "RNGdle Today",
     mailTo: "first@example.com, second@example.com",
     smtpAppPassword: "replacement-secret",
@@ -45,6 +49,10 @@ test("runtime settings persist, hot-apply, and never expose the password", async
   assert.equal(config.schedule.time, "09:15");
   assert.equal(config.schedule.retryMinutes, 45);
   assert.equal(config.schedule.emailRetryMinutes, 2);
+  assert.equal(config.likes.enabled, true);
+  assert.equal(config.likes.pollMinutes, 15);
+  assert.equal(config.likes.maxPerDay, 5);
+  assert.equal(config.likes.lookbackDays, 3);
   assert.equal(config.smtp.password, "replacement-secret");
   assert.deepEqual(config.smtp.to, ["first@example.com", "second@example.com"]);
   assert.equal(config.mail.fromName, "RNGdle Today");
