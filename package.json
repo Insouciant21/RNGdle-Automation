@@ -38,5 +38,15 @@
   "devDependencies": {
     "@playwright/test": "^1.64.1",
     "wrangler": "^4.151.1"
+  },
+  "cloudflare": {
+    "bindings": {
+      "CONFIG_JSON": {
+        "description": "Worker configuration as a single-line JSON string. Start from `.dev.vars.example`, then update SMTP and RNGdle values in Control Settings."
+      },
+      "MIGRATION_TOKEN": {
+        "description": "Random management token used by the `pnpm cloudflare` commands. Generate it with `openssl rand -hex 32`."
+      }
+    }
   }
 }

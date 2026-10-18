@@ -9,6 +9,7 @@ npm-debug.log*
 dist/
 .dev.vars
 .dev.vars.*
+!.dev.vars.example
 playwright-report/
 backups/
 wrangler.production.jsonc

@@ -2,6 +2,8 @@
 
 Astro 控制台与 Cloudflare Workers 每日自动化服务。默认每天按配置时区执行 RNGdle roll，可选生成并提交诗歌，再通过 SMTP 发送结果邮件。
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Insouciant21/RNGdle-Automation)
+
 ![RNGdle Control](docs/control-page.png)
 
 ## 功能
@@ -28,54 +30,6 @@ pnpm build
 浏览器测试使用独立 workerd 与临时 SQLite 存储，不访问真实 SMTP、LLM 或 RNGdle 账号。若未安装 Chromium，先运行 `pnpm exec playwright install chromium`。
 
 如需本地连接真实服务，先准备 `.env` 与 Worker secrets。`.env`、`.dev.vars`、`data/`、`backups/` 均已被忽略。
-
-## Deploy to Cloudflare
-
-1. 登录 Cloudflare 并准备配置：
-
-```bash
-pnpm install
-pnpm exec wrangler login
-cp .env.example .env
-# 填写 RNGDLE_EMAIL、SMTP_*、MAIL_*，以及可选 LLM_* 配置
-```
-
-2. 创建生产专用 Wrangler 配置。`wrangler.production.jsonc` 已被忽略，可以安全填写你的域名：
-
-```bash
-cp wrangler.jsonc wrangler.production.jsonc
-```
-
-编辑 `wrangler.production.jsonc`：
-
-- `name`：你的 Worker 名称
-- `vars.CONTROL_PUBLIC_URL`：你的 `workers.dev` 或自定义域名 HTTPS 地址
-- `vars.ALLOW_SETUP`：首次部署设为 `"true"`，完成 Control 密码设置后改回 `"false"`
-- 如使用自定义域名，按 Cloudflare zone 添加 `routes`
-- `env.staging` 可删除；生产配置不需要它
-
-3. 从 `.env` 生成 Worker secrets。输出文件包含 SMTP、LLM、RNGdle 账号等敏感信息，不要提交：
-
-```bash
-pnpm cloudflare:init https://your-worker-name.your-subdomain.workers.dev
-pnpm exec wrangler secret bulk data/cloudflare-secrets.json --config wrangler.production.jsonc
-```
-
-4. 构建并部署：
-
-```bash
-pnpm deploy:production
-```
-
-5. 打开 `CONTROL_PUBLIC_URL`，按页面完成 Control 密码设置。确认可登录后，将 `ALLOW_SETUP` 改为 `"false"`，再次运行 `pnpm deploy:production`。
-
-6. 在 Authentication 页面提交 RNGdle magic link，完成登录后启用自动任务：
-
-```bash
-MIGRATION_ORIGIN=https://your-worker-name.your-subdomain.workers.dev pnpm cloudflare resume
-```
-
-> Workers 使用 Durable Objects。请勿删除 `AUTOMATION` 命名空间或修改实例名 `primary`，否则会丢失登录 Cookie、历史状态、运行时配置和 Control 密码。
 
 ## 运行行为
 
