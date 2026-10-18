@@ -14,12 +14,13 @@
     "dev": "astro dev",
     "build": "CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV=false astro build",
     "preview": "astro preview",
-    "deploy": "pnpm build && wrangler deploy",
+    "deploy": "pnpm exec wrangler deploy",
     "start:legacy": "node src/index.js rngdle",
     "test:e2e": "playwright test",
     "cloudflare": "node scripts/cloudflare.mjs",
-    "deploy:production": "CLOUDFLARE_WRANGLER_CONFIG=wrangler.production.jsonc pnpm build && wrangler deploy",
-    "cloudflare:init": "node --env-file-if-exists=.env scripts/cloudflare.mjs init"
+    "cloudflare:init": "node --env-file-if-exists=.env scripts/cloudflare.mjs init",
+    "build:workers": "node scripts/prepare-workers-build.mjs && CLOUDFLARE_WRANGLER_CONFIG=wrangler.workers-build.jsonc pnpm build",
+    "deploy:workers": "pnpm build:workers && pnpm deploy"
   },
   "engines": {
     "node": ">=22.12.0"
@@ -46,6 +47,21 @@
       },
       "MIGRATION_TOKEN": {
         "description": "Random management token used by the `pnpm cloudflare` commands. Generate it with `openssl rand -hex 32`."
+      },
+      "CONTROL_PUBLIC_URL": {
+        "description": "Public HTTPS URL for the Control page. For a custom deployment, set this as a Workers Builds variable."
+      },
+      "ALLOW_SETUP": {
+        "description": "Set to `true` for a fresh deployment, then `false` after creating the Control password."
+      },
+      "WORKER_NAME": {
+        "description": "Optional Workers Builds variable used to override the Worker name without editing the repository."
+      },
+      "CUSTOM_DOMAIN": {
+        "description": "Optional Workers Builds variable hostname. When set, the generated configuration uses this custom domain route."
+      },
+      "ZONE_NAME": {
+        "description": "Cloudflare zone name, required when `CUSTOM_DOMAIN` is set."
       }
     }
   }

@@ -13,3 +13,4 @@ dist/
 playwright-report/
 backups/
 wrangler.production.jsonc
+wrangler.workers-build.jsonc
