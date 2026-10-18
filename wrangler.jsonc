@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rngdle-automation",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "binding": "ASSETS", "directory": "./dist" },
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "limits": { "cpu_ms": 30000 },
+  "vars": {
+    "CONTROL_PUBLIC_URL": "https://your-worker-name.your-subdomain.workers.dev",
+    "ALLOW_SETUP": "false"
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "AUTOMATION", "class_name": "Automation" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Automation"] }],
+  "env": {
+    "staging": {
+      "name": "rngdle-automation-staging",
+      "routes": [],
+      "vars": {
+        "CONTROL_PUBLIC_URL": "https://your-worker-name.your-subdomain.workers.dev",
+        "ALLOW_SETUP": "false"
+      },
+      "durable_objects": {
+        "bindings": [{ "name": "AUTOMATION", "class_name": "Automation" }]
+      }
+    }
+  }
+}

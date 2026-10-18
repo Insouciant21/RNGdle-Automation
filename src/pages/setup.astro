@@ -1,0 +1,22 @@
+---
+import AuthLayout from '../layouts/AuthLayout.astro';
+const migrationRequired = Astro.locals.session?.migrationRequired;
+---
+<AuthLayout title="Set up RNGdle Control">
+{migrationRequired ? <main class="setup"><h1>Migration in progress</h1><p class="note">The existing Control account is being imported. Please return shortly.</p></main> : <>
+<main class="setup">
+    <h1>Set up RNGdle Control</h1>
+    <p>First-run access protection</p>
+    <p class="note">Create the password used to access this Control page. Your password is stored as a one-way hash.</p>
+    <form id="setup-form">
+      <label for="password">Control password</label>
+      <input id="password" type="password" autocomplete="new-password" minlength="8" required>
+      <label for="confirmation">Confirm password</label>
+      <input id="confirmation" type="password" autocomplete="new-password" minlength="8" required>
+      <button id="submit" type="submit">Create password</button>
+      <div id="feedback" class="feedback" role="alert"></div>
+    </form>
+  </main>
+</>}
+</AuthLayout>
+<script>import '../client/setup.js';</script>

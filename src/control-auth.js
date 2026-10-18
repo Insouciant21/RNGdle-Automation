@@ -70,28 +70,32 @@ function cleanSessions(document, now = Date.now()) {
   );
 }
 
-export async function createControlAuth({ authPath, initialPassword, sessionDays = 7 }) {
-  let document = await readDocument(authPath);
+export async function createControlAuth({ authPath, initialPassword, sessionDays = 7, storage }) {
+  const read = () => storage ? storage.get("auth") : readDocument(authPath);
+  const write = (value) => storage ? storage.put("auth", value) : writeDocument(authPath, value);
+  let document = await read();
   if (!document) {
     document = {
       version: AUTH_VERSION,
       password: initialPassword ? await hashPassword(passwordInput(initialPassword)) : null,
       sessions: [],
     };
-    await writeDocument(authPath, document);
+    await write(document);
   }
   if (document.version !== AUTH_VERSION || (document.password !== null && !document.password)) {
     throw new Error("Unsupported Control authentication state format");
   }
   cleanSessions(document);
-  await writeDocument(authPath, document);
-
-  const failedAttempts = new Map();
+  const failedAttempts = new Map(Object.entries(document.failures ?? {}));
   const maxAgeSeconds = sessionDays * 24 * 60 * 60;
 
   async function persist() {
     cleanSessions(document);
-    await writeDocument(authPath, document);
+    for (const [address, entry] of failedAttempts) {
+      if (entry.resetAt <= Date.now()) failedAttempts.delete(address);
+    }
+    document.failures = Object.fromEntries(failedAttempts);
+    await write(document);
   }
 
   function rateLimitKey(address) {
@@ -121,9 +125,10 @@ export async function createControlAuth({ authPath, initialPassword, sessionDays
   async function login(password, address) {
     if (!document.password) throw new Error("Control password has not been configured");
     if (isRateLimited(address)) throw new Error("Too many failed attempts. Try again in a minute.");
-    const valid = typeof password === "string" && await verifyPassword(password, document.password);
+    const valid = typeof password === "string" && password.length <= 512 && await verifyPassword(password, document.password);
     if (!valid) {
       recordFailure(address);
+      await persist();
       throw new Error("Invalid Control password");
     }
     failedAttempts.delete(rateLimitKey(address));
@@ -197,7 +202,7 @@ export async function createControlAuth({ authPath, initialPassword, sessionDays
 }
 
 export function parseCookies(request) {
-  const header = request.headers.cookie ?? "";
+  const header = request.headers.get?.("cookie") ?? request.headers.cookie ?? "";
   return Object.fromEntries(
     header
       .split(";")

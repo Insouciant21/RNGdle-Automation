@@ -1,0 +1,29 @@
+---
+import '@fontsource-variable/inter';
+import '@fontsource/space-mono/400.css';
+import '@fontsource/space-mono/700.css';
+import 'perfect-scrollbar/css/perfect-scrollbar.css';
+import '../styles/control.css';
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RNGdle Control</title>
+    <link rel="icon" href="https://www.rngdle.com/favicon/web-app-manifest-192x192.png" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a id="brand-link" class="brand" href="https://www.rngdle.com" target="_blank" rel="noopener noreferrer"><img src="https://www.rngdle.com/favicon/web-app-manifest-192x192.png" alt="" /><span>RNGdle</span><span class="brand-context">Control</span></a>
+      <nav class="tabs" role="tablist" aria-label="Control views">
+        <button class="tab active" role="tab" aria-selected="true" data-view="overview">Overview</button>
+        <button class="tab" role="tab" aria-selected="false" data-view="logs">Logs</button>
+        <button class="tab" role="tab" aria-selected="false" data-view="auth">Authentication</button>
+        <button class="tab" role="tab" aria-selected="false" data-view="settings">Settings</button>
+      </nav>
+      <div class="header-state"><span id="header-dot" class="dot"></span><span id="header-status">Connecting</span><button id="logout-button" class="header-action" type="button">Sign out</button></div>
+    </header>
+    <div id="main-scroll" class="main-scroll" tabindex="0"><main><slot /></main></div>
+  </body>
+</html>

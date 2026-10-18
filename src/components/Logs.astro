@@ -1,0 +1,8 @@
+<section id="view-logs" class="view" role="tabpanel" hidden>
+      <h1 class="view-title">Logs</h1><p class="view-kicker">Recent automation activity</p>
+      <div class="toolbar">
+        <div class="toolbar-group"><select id="log-level" class="select" aria-label="Log level"><option value="all">All levels</option><option value="info">Info</option><option value="error">Errors</option></select><label class="check"><input id="log-auto" type="checkbox" checked>Auto refresh</label></div>
+        <button id="log-refresh" class="button quiet" type="button">Refresh</button>
+      </div>
+      <div id="log-panel" class="log-panel" tabindex="0" aria-live="polite"><div class="log-empty">Loading logs</div></div>
+    </section>

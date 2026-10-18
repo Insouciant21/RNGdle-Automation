@@ -20,10 +20,13 @@ export function isRngdleUrl(candidate, baseUrl) {
 }
 
 export async function createRngdleSession(config) {
-  const cookiePath = config.storage.cookiePath ?? path.join(config.storage.directory, "cookies.json");
+  const cookiePath = config.storage.adapter ? null
+    : config.storage.cookiePath ?? path.join(config.storage.directory, "cookies.json");
   const cookies = Object.create(null);
   try {
-    const document = JSON.parse(await fs.readFile(cookiePath, "utf8"));
+    const document = config.storage.adapter
+      ? await config.storage.adapter.get("cookies") ?? { version: 1, cookies: {} }
+      : JSON.parse(await fs.readFile(cookiePath, "utf8"));
     if (document.version !== 1 || !document.cookies || typeof document.cookies !== "object" || Array.isArray(document.cookies)) {
       throw new Error("Unsupported cookie format");
     }
@@ -37,6 +40,11 @@ export async function createRngdleSession(config) {
   // Serialize cookie writes when public assets are downloaded concurrently.
   let pendingWrite = Promise.resolve();
   function persist() {
+    if (config.storage.adapter) {
+      const document = { version: 1, cookies: { ...cookies } };
+      pendingWrite = pendingWrite.then(() => config.storage.adapter.put("cookies", document));
+      return pendingWrite;
+    }
     const document = JSON.stringify({ version: 1, cookies }, null, 2) + "\n";
     pendingWrite = pendingWrite.then(async () => {
       await fs.mkdir(path.dirname(cookiePath), { recursive: true });

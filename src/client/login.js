@@ -1,0 +1,3 @@
+
+    const form=document.getElementById('login-form'); const password=document.getElementById('password'); const button=document.getElementById('submit'); const feedback=document.getElementById('feedback');
+    form?.addEventListener('submit',async(event)=>{ event.preventDefault(); button.disabled=true; feedback.textContent=''; try { const response=await fetch('/api/auth/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:password.value})}); const data=await response.json(); if(!response.ok) throw new Error(data.message||'Sign in failed'); window.location.href='/'; } catch(error) { feedback.textContent=error.message; password.select(); button.disabled=false; } });

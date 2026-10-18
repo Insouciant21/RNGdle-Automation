@@ -1,0 +1,46 @@
+<section id="view-settings" class="view" role="tabpanel" hidden>
+      <h1 class="view-title">Settings</h1><p class="view-kicker">Persisted runtime configuration</p>
+      <form id="settings-form" class="settings-form">
+        <section class="settings-group">
+          <div class="settings-heading"><h2>Automation</h2><p>Schedule and HTTP requests</p></div>
+          <div class="form-grid">
+            <div class="form-field"><label class="field-label" for="timezone">Timezone</label><input class="input" id="timezone" required></div>
+            <div class="form-field"><label class="field-label" for="schedule-time">Daily time</label><input class="input" id="schedule-time" type="time" required></div>
+            <div class="form-field"><label class="field-label" for="rngdle-retry-minutes">RNGdle retry minutes</label><input class="input" id="rngdle-retry-minutes" type="number" min="1" max="1440" required></div>
+            <div class="form-field"><label class="field-label" for="email-retry-minutes">Email retry minutes</label><input class="input" id="email-retry-minutes" type="number" min="1" max="1440" required></div>
+            <div class="form-field" hidden><label class="field-label" for="poll-seconds">Poll seconds</label><input class="input" id="poll-seconds" type="number" min="5" max="3600" required></div>
+            <div class="form-field"><label class="field-label" for="http-timeout">HTTP timeout ms</label><input class="input" id="http-timeout" type="number" min="5000" max="300000" required></div>
+            <div class="form-field"><label class="field-label" for="control-url">Control public URL</label><input class="input" id="control-url" type="url" readonly required></div>
+          </div>
+        </section>
+        <section class="settings-group">
+          <div class="settings-heading"><h2>Delivery</h2><p>Account and recipients</p></div>
+          <div class="form-grid">
+            <div class="form-field"><label class="field-label" for="rngdle-email">RNGdle email</label><input class="input" id="rngdle-email" type="email" required></div>
+            <div class="form-field"><label class="field-label" for="smtp-username">SMTP username</label><input class="input" id="smtp-username" type="email" required></div>
+            <div class="form-field"><label class="field-label" for="smtp-from">From address</label><input class="input" id="smtp-from" type="email" required></div>
+            <div class="form-field"><label class="field-label" for="sender-name">Sender name</label><input class="input" id="sender-name" required></div>
+            <div class="form-field"><label class="field-label" for="subject-prefix">Subject prefix</label><input class="input" id="subject-prefix" required></div>
+            <div class="form-field full"><label class="field-label" for="mail-to">Recipients</label><input class="input" id="mail-to" required></div>
+          </div>
+        </section>
+        <section class="settings-group">
+          <div class="settings-heading"><h2>SMTP</h2><p>Mail transport</p></div>
+          <div class="form-grid">
+            <div class="form-field"><label class="field-label" for="smtp-host">Host</label><input class="input" id="smtp-host" required></div>
+            <div class="form-field"><label class="field-label" for="smtp-port">Port</label><input class="input" id="smtp-port" type="number" min="1" max="65535" required></div>
+            <div class="form-field full"><label class="field-label" for="smtp-password">SMTP password <span id="secret-state" class="secret-state"></span></label><input class="input" id="smtp-password" type="password" autocomplete="new-password" placeholder="Leave blank to keep current password"></div>
+            <div class="form-field full"><div class="toolbar-group"><label class="check"><input id="smtp-secure" type="checkbox">Implicit TLS</label><label class="check"><input id="smtp-require-tls" type="checkbox">Require STARTTLS</label></div></div>
+          </div>
+        </section>
+        <section class="settings-group">
+          <div class="settings-heading"><h2>Security</h2><p>Control access</p></div>
+          <div class="form-grid">
+            <div class="form-field"><label class="field-label" for="control-password">New Control password</label><input class="input" id="control-password" type="password" autocomplete="new-password" minlength="8"></div>
+            <div class="form-field"><label class="field-label" for="control-password-confirm">Confirm password</label><input class="input" id="control-password-confirm" type="password" autocomplete="new-password" minlength="8"></div>
+            <div class="form-field full"><p class="password-help">Changing the password signs out all active sessions. Minimum 8 characters.</p><div id="password-message" class="feedback" role="status"></div><button id="password-save" class="button secondary" type="button">Change Control password</button></div>
+          </div>
+        </section>
+        <div class="settings-actions"><span id="settings-message" class="feedback" role="status"></span><button id="settings-save" class="button" type="submit">Save settings</button></div>
+      </form>
+    </section>

@@ -12,6 +12,7 @@ import { composeDailyPoem, inspectPoem } from "../src/poem-http.js";
 const wordSource = await fs.readFile(new URL("./fixtures/rngdle-word-data.txt", import.meta.url), "utf8");
 const actions = 'var roll=(0,S.createServerReference)("001122",S.callServer,void 0,S.findSourceMapURL,"rollDiceAction"),poem=(0,S.createServerReference)("409988",S.callServer,void 0,S.findSourceMapURL,"submitPoem");';
 const badges = [{ id: "MOUNTAIN", label: "Mountain" }, { id: "HELIUM", label: "Helium", isScoring: false }, { id: "EVEN", label: "Even" }];
+import { MemoryStorage } from "./helpers/cloud-fixture.js";
 
 async function fixture(context) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "rngdle-http-"));
@@ -60,6 +61,18 @@ test("literal parser reconstructs deterministic official IDs without executing d
   assert.notDeepEqual(buildWordBank(data, badges, 123456), bank);
   assert.throws(() => parseWordData(wordSource.replace("1664525", "1664526")), /algorithm changed/);
   assert.throws(() => parseWordData(wordSource.replace('"mountains"', 'process.exit()')));
+});
+
+test("Durable Object cookie storage works without any filesystem paths", async (context) => {
+  const { config } = await fixture(context);
+  const storage = new MemoryStorage();
+  config.storage = { adapter: storage };
+  const first = await createRngdleSession(config);
+  await (await first.request("/api/home")).text();
+  assert.equal((await storage.get("cookies")).cookies.session, "fresh-token");
+  const second = await createRngdleSession(config);
+  await (await second.request("/api/home")).text();
+  assert.equal((await storage.get("cookies")).cookies.session, "fresh-token");
 });
 
 test("poem is submitted by HTTP using dynamic action ID, official tile IDs, and persisted cookies", async (context) => {

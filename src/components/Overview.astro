@@ -1,0 +1,54 @@
+<section id="view-overview" class="view" role="tabpanel">
+      <div class="status-hero">
+        <div class="status-frame"><strong id="status" class="status-copy" aria-live="polite">Loading</strong></div>
+        <div class="meta"><span id="state-tag" class="tag">Connecting</span><span aria-hidden="true">•</span><span id="schedule-meta">Loading schedule</span></div>
+      </div>
+      <div class="overview-grid">
+        <div>
+          <section class="section">
+            <div class="section-heading"><h2>Latest roll</h2><span id="result-date" class="section-meta">No result</span></div>
+            <div class="panel">
+              <div class="result-summary"><span id="roll-number" class="roll-number">------</span><div id="roll-rarity" class="roll-rarity rarity-unknown"><span id="roll-rarity-icon">?</span><span id="roll-rarity-label">Rarity unavailable</span></div></div>
+              <div class="stats">
+                <div class="stat"><span id="earned-ep" class="stat-value">-</span><span class="stat-label">Earned EP</span></div>
+                <div class="stat"><span id="total-ep" class="stat-value">-</span><span class="stat-label">Lifetime EP</span></div>
+                <div class="stat"><span id="badge-count" class="stat-value">-</span><span class="stat-label">Badges</span></div>
+                <div class="stat"><span id="mail-state" class="stat-value">-</span><span class="stat-label">Email</span></div>
+              </div>
+              <div id="poem-section" class="badge-breakdown" hidden><div class="badge-breakdown-heading"><span>Poem</span></div><p id="poem-text"></p></div>
+              <div class="badge-breakdown"><div class="badge-breakdown-heading"><span>Badge breakdown</span><span id="badge-count-label" class="section-meta">-</span></div><div id="badge-list" class="badge-list"><div class="badge-empty">No badge data</div></div></div>
+            </div>
+          </section>
+        </div>
+        <aside>
+          <section class="section">
+            <div class="section-heading"><h2>Run state</h2><span id="run-date" class="section-meta">Today</span></div>
+            <div class="panel">
+              <div class="detail-row"><span class="detail-label">Status</span><strong id="run-status" class="detail-value">-</strong></div>
+              <div class="detail-row"><span class="detail-label">RNGdle attempts</span><strong id="run-attempts" class="detail-value">-</strong></div>
+              <div class="detail-row"><span class="detail-label">RNGdle next retry</span><strong id="next-rngdle-retry" class="detail-value">-</strong></div>
+              <div class="detail-row"><span class="detail-label">Poem automation</span><strong id="poem-enabled" class="detail-value">-</strong></div>
+              <div class="detail-row"><span class="detail-label">Poem attempts</span><strong id="poem-attempts" class="detail-value">-</strong></div>
+              <div class="detail-row"><span class="detail-label">Poem next retry</span><strong id="next-poem-retry" class="detail-value">-</strong></div>
+              <div class="detail-row"><span class="detail-label">Email attempts</span><strong id="email-attempts" class="detail-value">-</strong></div>
+              <div class="detail-row"><span class="detail-label">Email next retry</span><strong id="next-email-retry" class="detail-value">-</strong></div>
+              <div class="detail-row"><span class="detail-label">Recipients</span><strong id="mail-recipients" class="detail-value">-</strong></div>
+            </div>
+          </section>
+          <section class="section">
+            <div class="section-heading"><h2>Email</h2><span class="section-meta">Result delivery</span></div>
+            <div class="panel">
+              <div class="sidebar-actions">
+                <button id="email-send" class="button" type="button">Send email</button>
+                <a id="preview-open" class="button quiet" href="/preview/email?type=result" target="_blank">Open preview</a>
+                <div id="email-message" class="feedback email-feedback" role="status"></div>
+              </div>
+            </div>
+          </section>
+          <section id="error-section" class="section" hidden>
+            <div class="section-heading"><h2>Last error</h2></div>
+            <div class="panel"><div class="detail-row"><span id="last-error" class="detail-value" style="text-align:left"></span></div></div>
+          </section>
+        </aside>
+      </div>
+    </section>

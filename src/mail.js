@@ -34,8 +34,17 @@ function transport(config) {
     port: config.smtp.port,
     secure: config.smtp.secure,
     requireTLS: config.smtp.requireTls,
+    connectionTimeout: config.http?.timeoutMs ?? 45_000,
+    greetingTimeout: config.http?.timeoutMs ?? 45_000,
+    socketTimeout: config.http?.timeoutMs ?? 45_000,
     auth,
   });
+}
+
+export async function verifyMailTransport(config) {
+  const client = transport(config);
+  try { return await client.verify(); }
+  finally { client.close(); }
 }
 
 function fromAddress(config) {

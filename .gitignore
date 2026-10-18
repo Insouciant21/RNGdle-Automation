@@ -4,3 +4,11 @@ config/config.yaml
 .env
 test-results/
 npm-debug.log*
+.astro/
+.wrangler/
+dist/
+.dev.vars
+.dev.vars.*
+playwright-report/
+backups/
+wrangler.production.jsonc

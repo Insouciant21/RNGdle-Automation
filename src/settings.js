@@ -168,7 +168,10 @@ async function writeSettings(settingsPath, settings) {
 export async function loadRuntimeSettings(config) {
   let document;
   try {
-    document = JSON.parse(await fs.readFile(config.storage.settingsPath, "utf8"));
+    document = config.storage.adapter
+      ? await config.storage.adapter.get("settings")
+      : JSON.parse(await fs.readFile(config.storage.settingsPath, "utf8"));
+    if (!document) return false;
   } catch (error) {
     if (error.code === "ENOENT") return false;
     throw new Error(`Unable to read runtime settings: ${error.message}`);
@@ -183,7 +186,11 @@ export async function loadRuntimeSettings(config) {
 
 export async function saveRuntimeSettings(config, input) {
   const settings = validateSettings(input, config);
-  await writeSettings(config.storage.settingsPath, settings);
+  if (config.storage.adapter) {
+    await config.storage.adapter.put("settings", { version: SETTINGS_VERSION, updatedAt: new Date().toISOString(), values: settings });
+  } else {
+    await writeSettings(config.storage.settingsPath, settings);
+  }
   applySettings(config, settings);
   return publicSettings(config);
 }

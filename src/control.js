@@ -11,7 +11,7 @@ import {
 } from "./mail.js";
 import { publicSettings, saveRuntimeSettings } from "./settings.js";
 import { readState } from "./state.js";
-import { cardRarity } from "./rarity.js";
+import { newestDay, overviewPayload } from "./control-data.js";
 
 const MAX_BODY_BYTES = 32 * 1024;
 const EMAIL_TYPES = new Set(["result", "authentication"]);
@@ -113,75 +113,6 @@ async function readJson(request) {
     if (Buffer.byteLength(body) > MAX_BODY_BYTES) throw new Error("Request body is too large");
   }
   return JSON.parse(body || "{}");
-}
-
-function newestDay(state, predicate = () => true) {
-  const date = Object.keys(state.days)
-    .sort()
-    .reverse()
-    .find((candidate) => predicate(state.days[candidate]));
-  return date ? { date, day: state.days[date] } : null;
-}
-
-async function overviewPayload(config, status) {
-  const state = await readState(config.storage.statePath);
-  const latest = newestDay(state);
-  const latestResult = newestDay(state, (day) => Boolean(day.result));
-  const splitRetryState = latest
-    ? ["nextRngdleRetryAt", "nextPoemRetryAt", "nextEmailRetryAt"].some((key) => Object.hasOwn(latest.day, key))
-    : false;
-  const legacyRetryAt = splitRetryState ? null : latest?.day.nextRetryAt ?? null;
-  return {
-    status,
-    generatedAt: new Date().toISOString(),
-    schedule: {
-      timezone: config.timezone,
-      time: config.schedule.time,
-      retryMinutes: config.schedule.retryMinutes,
-      rngdleRetryMinutes: config.schedule.retryMinutes,
-      emailRetryMinutes: config.schedule.emailRetryMinutes ?? 1,
-      poemEnabled: config.poem?.enabled ?? false,
-      poemRetryMinutes: config.poem?.retryMinutes ?? 5,
-    },
-    rngdle: { email: config.rngdle.email, baseUrl: config.rngdle.baseUrl },
-    mail: { from: config.smtp.from, to: [...config.smtp.to] },
-    latest: latest
-      ? {
-          date: latest.date,
-          status: latest.day.status,
-          attempts: latest.day.attempts ?? 0,
-          emailAttempts: latest.day.emailAttempts ?? 0,
-          poemAttempts: latest.day.poemAttempts ?? 0,
-          nextPoemRetryAt: latest.day.nextPoemRetryAt ?? null,
-          nextRngdleRetryAt: splitRetryState ? latest.day.nextRngdleRetryAt ?? null : legacyRetryAt,
-          nextEmailRetryAt: splitRetryState
-            ? latest.day.nextEmailRetryAt ?? null
-            : latest.day.status === "email_pending"
-              ? legacyRetryAt
-              : null,
-          nextRetryAt: splitRetryState
-            ? latest.day.status === "poem_pending"
-              ? latest.day.nextPoemRetryAt ?? null
-              : latest.day.status === "email_pending"
-              ? latest.day.nextEmailRetryAt ?? null
-              : latest.day.nextRngdleRetryAt ?? null
-            : legacyRetryAt,
-          lastError: latest.day.lastError ?? null,
-          emailSent: Boolean(latest.day.emailSentAt),
-        }
-      : null,
-    result: latestResult
-      ? {
-          date: latestResult.date,
-          number: latestResult.day.result.number,
-          earnedEp: latestResult.day.result.earnedEp,
-          totalEp: latestResult.day.result.totalEp,
-          rarity: latestResult.day.result.rarity ?? cardRarity(latestResult.day.result.earnedEp),
-          badges: latestResult.day.result.badges,
-          poem: latestResult.day.result.poem ?? null,
-        }
-      : null,
-  };
 }
 
 async function selectedResult(config, requestedDate) {
@@ -327,7 +258,7 @@ export async function createControlServer(
         await auth.changePassword(password, confirmation);
         sendJson(response, 200, { message: "Control password changed. Sign in again." }, { "Set-Cookie": expiredSessionCookie(config.control.cookieSecure) });
       } else if (request.method === "GET" && url.pathname === "/api/overview") {
-        sendJson(response, 200, await overviewPayload(config, status));
+        sendJson(response, 200, overviewPayload(config, status, await readState(config.storage.statePath)));
       } else if (request.method === "GET" && url.pathname === "/api/logs") {
         const level = url.searchParams.get("level") ?? "all";
         if (!new Set(["all", "info", "error"]).has(level)) throw new Error("Invalid log level");
