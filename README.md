@@ -40,34 +40,6 @@ pnpm build
 - Control Session 使用 Secure、HttpOnly Cookie，写操作要求同源和 CSRF Token
 - SMTP 接受邮件后、状态保存前中断仍可能导致重复投递，系统不承诺严格一次发送
 
-## 从旧 Docker 部署迁移
-
-导出命令需要显式提供旧服务器和项目路径，不会内置任何服务器地址：
-
-```bash
-CONTROL_PUBLIC_URL=https://your-worker-name.your-subdomain.workers.dev \
-  pnpm cloudflare export data/legacy-snapshot.json user@example-host /path/to/RNGdle-Automation
-```
-
-导出包含旧环境实际配置、Cookie、每日状态、诗歌草稿、运行时设置和 Control 密码哈希；旧 Session 与文件锁不迁移。文件按 `0600` 保存，包含敏感数据。
-
-导入目标必须为空，重复导入会返回 `409`，不会覆盖线上数据：
-
-```bash
-MIGRATION_ORIGIN=https://your-worker-name.your-subdomain.workers.dev \
-  pnpm cloudflare import data/legacy-snapshot.json
-```
-
-原 Control 密码继续有效，但需要重新登录。导入后先验证，再启用调度：
-
-```bash
-pnpm cloudflare verify smtp
-pnpm cloudflare verify rngdle
-pnpm cloudflare resume
-```
-
-`verify poem` 会读取实时词库并调用模型生成与校验候选，不覆盖已有诗歌；`verify email` 会真实发送一次结果邮件。
-
 ## 管理与备份
 
 管理工具通过 `/__migration/*` 和独立 Bearer Token 访问。Token 保存在被忽略的 `data/cloudflare-migration.json`，可用 `MIGRATION_CREDENTIALS` 指定其他路径，`MIGRATION_ORIGIN` 临时覆盖目标地址。
