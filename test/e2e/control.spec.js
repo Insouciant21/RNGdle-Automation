@@ -25,7 +25,7 @@ test("Workers runtime serves authenticated Astro views and persists settings", a
   await page.getByRole("tab", { name: "Settings", exact: true }).click();
   await expect(page.locator("#smtp-password")).toHaveValue("");
   await expect(page.locator("#return-likes-enabled")).not.toBeChecked();
-  await expect(page.locator("#return-likes-poll-minutes")).toHaveValue("10");
+  await expect(page.locator("#return-likes-poll-minutes")).toHaveValue("60");
   await expect(page.locator("#return-likes-max-per-day")).toHaveValue("10");
   await page.locator("#schedule-time").fill("09:13");
   await page.getByRole("button", { name: "Save settings", exact: true }).click();

@@ -161,7 +161,7 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
     },
     likes: {
       enabled: booleanValue(raw.likes?.enabled ?? false, "likes.enabled"),
-      pollMinutes: positiveInteger(raw.likes?.pollMinutes ?? 10, "likes.pollMinutes"),
+      pollMinutes: positiveInteger(raw.likes?.pollMinutes ?? 60, "likes.pollMinutes"),
       maxPerDay: positiveInteger(raw.likes?.maxPerDay ?? 10, "likes.maxPerDay"),
       lookbackDays: positiveInteger(raw.likes?.lookbackDays ?? 7, "likes.lookbackDays"),
     },

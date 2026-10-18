@@ -81,7 +81,7 @@ export class AutomationService {
     if (!config.likes?.enabled) return null;
     const current = await this.storage.get("social");
     const lastChecked = Date.parse(current?.lastCheckedAt);
-    const interval = (config.likes.pollMinutes ?? 10) * 60_000;
+    const interval = (config.likes.pollMinutes ?? 60) * 60_000;
     if (Number.isFinite(lastChecked) && lastChecked + interval > now.getTime()) return null;
     const social = current ?? createReturnLikeState(now);
     const session = await createRngdleSession(config);

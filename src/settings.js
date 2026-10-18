@@ -72,7 +72,7 @@ export function publicSettings(config) {
     emailRetryMinutes: config.schedule.emailRetryMinutes ?? 1,
     pollSeconds: config.schedule.pollSeconds,
     returnLikesEnabled: config.likes?.enabled ?? false,
-    returnLikesPollMinutes: config.likes?.pollMinutes ?? 10,
+    returnLikesPollMinutes: config.likes?.pollMinutes ?? 60,
     returnLikesMaxPerDay: config.likes?.maxPerDay ?? 10,
     returnLikesLookbackDays: config.likes?.lookbackDays ?? 7,
     rngdleEmail: config.rngdle.email,
@@ -113,7 +113,7 @@ export function validateSettings(input, config) {
     pollSeconds: integerValue(input.pollSeconds ?? config.schedule.pollSeconds, "pollSeconds", 5, 3_600),
     returnLikesEnabled: booleanValue(input.returnLikesEnabled ?? config.likes?.enabled ?? false, "returnLikesEnabled"),
     returnLikesPollMinutes: integerValue(
-      input.returnLikesPollMinutes ?? config.likes?.pollMinutes ?? 10,
+      input.returnLikesPollMinutes ?? config.likes?.pollMinutes ?? 60,
       "returnLikesPollMinutes",
       5,
       1_440,

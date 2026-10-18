@@ -25,7 +25,7 @@ function nextWorkflowWake(config, state, now) {
 
 export function nextReturnLikeWake(config, social, now = new Date()) {
   if (!config.likes?.enabled) return Infinity;
-  const interval = (config.likes.pollMinutes ?? 10) * 60_000;
+  const interval = (config.likes.pollMinutes ?? 60) * 60_000;
   const last = Date.parse(social?.lastCheckedAt);
   if (!Number.isFinite(last)) return now.getTime() + 1000;
   return Math.max(now.getTime() + 1000, last + interval);

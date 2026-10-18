@@ -48,7 +48,7 @@ poem:
 
 likes:
   enabled: "${RETURN_LIKES_ENABLED:-false}"
-  pollMinutes: "${RETURN_LIKES_POLL_MINUTES:-10}"
+  pollMinutes: "${RETURN_LIKES_POLL_MINUTES:-60}"
   maxPerDay: "${RETURN_LIKES_MAX_PER_DAY:-10}"
   lookbackDays: "${RETURN_LIKES_LOOKBACK_DAYS:-7}"
 

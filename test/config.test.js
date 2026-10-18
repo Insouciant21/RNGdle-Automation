@@ -21,7 +21,7 @@ test("loads YAML and expands secret environment variables", async (context) => {
   assert.equal(config.schedule.emailRetryMinutes, 1);
   assert.equal(config.control.port, 3000);
   assert.equal(config.mail.fromName, "RNGdle Today");
-  assert.deepEqual(config.likes, { enabled: false, pollMinutes: 10, maxPerDay: 10, lookbackDays: 7 });
+  assert.deepEqual(config.likes, { enabled: false, pollMinutes: 60, maxPerDay: 10, lookbackDays: 7 });
 });
 
 test("loads generic SMTP settings from environment variables", async (context) => {
