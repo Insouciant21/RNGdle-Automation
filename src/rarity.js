@@ -1,8 +1,8 @@
 // These thresholds and colors mirror RNGdle's public rarity palette.
 // Badge rarity is score-based and remains deterministic when /api/home omits it.
-export const RARITY_ORDER = ["trash", "common", "uncommon", "rare", "epic", "anomaly", "mythic"];
+const RARITY_ORDER = ["trash", "common", "uncommon", "rare", "epic", "anomaly", "mythic"];
 
-export const RARITY_LABELS = {
+const RARITY_LABELS = {
   trash: "Trash",
   common: "Common",
   uncommon: "Uncommon",
@@ -13,7 +13,7 @@ export const RARITY_LABELS = {
   unknown: "Rarity unavailable",
 };
 
-export const RARITY_PALETTE = {
+const RARITY_PALETTE = {
   trash: { bg: "#fffbeb", gradient: "linear-gradient(135deg,#fffbeb,#fff7ed)", border: "#d97706", text: "#92400e", accent: "#c8a87c" },
   common: { bg: "#f9fafb", gradient: "linear-gradient(135deg,#f3f4f6,#ffffff)", border: "#9ca3af", text: "#4b5563", accent: "#d1d5db" },
   uncommon: { bg: "#ecfdf5", gradient: "linear-gradient(135deg,#d1fae5,#f0fdf4)", border: "#10b981", text: "#047857", accent: "#6ee7b7" },

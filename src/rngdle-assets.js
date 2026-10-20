@@ -4,6 +4,7 @@ import { isRngdleUrl, responseText } from "./rngdle-http.js";
 
 const cache = new Map();
 const serverActionCache = new Map();
+const ASSET_CACHE_LIMIT = 96;
 const SERVER_ACTION_TTL_MS = 6 * 60 * 60 * 1000;
 // Fingerprint of the observed selection function, not of the word dictionary.
 // A changed algorithm must be reviewed before using its reconstructed word IDs.
@@ -115,28 +116,38 @@ export function buildWordBank(data, badges, rollNumber) {
   return tiles.sort((a, b) => (rank.get(a.category) ?? 99) - (rank.get(b.category) ?? 99) || a.word.localeCompare(b.word, "en"));
 }
 
-export async function discoverRngdleAssets(session, baseUrl, { words = false, actionName } = {}) {
-  const page = await session.request("/", { headers: { Accept: "text/html" } });
+async function pageScripts(session, baseUrl, pagePath = "/") {
+  const page = await session.request(pagePath, { headers: { Accept: "text/html" } });
   if (!page.ok) throw new Error(`RNGdle page returned HTTP ${page.status}`);
   const html = await responseText(page);
   const scripts = [...new Set([...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)].map((match) => new URL(match[1], baseUrl).href))]
     .filter((url) => isRngdleUrl(url, baseUrl) && new URL(url).pathname.startsWith("/_next/static/") && new URL(url).pathname.endsWith(".js"));
   if (!scripts.length || scripts.length > 100) throw new Error("RNGdle page exposed an unexpected script list");
+  return scripts;
+}
+
+async function scriptMetadata(session, url) {
+  if (cache.has(url)) return cache.get(url);
+  const response = await session.request(url);
+  if (!response.ok) throw new Error(`RNGdle asset returned HTTP ${response.status}`);
+  const source = await responseText(response);
+  const metadata = { source, actions: {} };
+  for (const name of ["rollDiceAction", "submitPoem"]) {
+    const actionId = findServerAction(source, name);
+    if (actionId) metadata.actions[name] = actionId;
+  }
+  if (source.includes('"WORD_VARIANTS"') && source.includes('"getWordsForBadges"')) metadata.wordSource = source;
+  cache.set(url, metadata);
+  if (cache.size > ASSET_CACHE_LIMIT) cache.delete(cache.keys().next().value);
+  return metadata;
+}
+
+export async function discoverRngdleAssets(session, baseUrl, { words = false, actionName } = {}) {
+  const scripts = await pageScripts(session, baseUrl);
   let wordData;
   const actions = {};
   for (let start = 0; start < scripts.length; start += 4) {
-    const batch = await Promise.all(scripts.slice(start, start + 4).map(async (url) => {
-      if (cache.has(url)) return cache.get(url);
-      const response = await session.request(url);
-      if (!response.ok) throw new Error(`RNGdle asset returned HTTP ${response.status}`);
-      const source = await responseText(response);
-      const metadata = { actions: {}, source };
-      for (const match of source.matchAll(/createServerReference\)\("([a-f0-9]+)"[^)]*"(rollDiceAction|submitPoem)"\)/g)) metadata.actions[match[2]] = match[1];
-      if (source.includes('"WORD_VARIANTS"') && source.includes('"getWordsForBadges"')) metadata.wordSource = source;
-      cache.set(url, metadata);
-      if (cache.size > 64) cache.delete(cache.keys().next().value);
-      return metadata;
-    }));
+    const batch = await Promise.all(scripts.slice(start, start + 4).map((url) => scriptMetadata(session, url)));
     for (const metadata of batch) {
       Object.assign(actions, metadata.actions);
       if (words && metadata.wordSource && !metadata.wordData) metadata.wordData = parseWordData(metadata.wordSource);
@@ -169,13 +180,7 @@ export async function discoverServerAction(session, baseUrl, { pagePath = "/", a
   const cached = serverActionCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.actionId;
 
-  const page = await session.request(pagePath, { headers: { Accept: "text/html" } });
-  if (!page.ok) throw new Error(`RNGdle page returned HTTP ${page.status}`);
-  const html = await responseText(page);
-  const roots = [...new Set([...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)]
-    .map((match) => new URL(match[1], baseUrl).href))]
-    .filter((url) => isRngdleUrl(url, baseUrl) && new URL(url).pathname.startsWith("/_next/static/") && new URL(url).pathname.endsWith(".js"));
-  if (!roots.length || roots.length > 100) throw new Error("RNGdle page exposed an unexpected script list");
+  const roots = await pageScripts(session, baseUrl, pagePath);
 
   const seen = new Set(roots);
   let queue = roots;
@@ -183,15 +188,10 @@ export async function discoverServerAction(session, baseUrl, { pagePath = "/", a
     const next = [];
     for (let start = 0; start < queue.length; start += 6) {
       const sources = await Promise.all(queue.slice(start, start + 6).map(async (url) => {
-        if (cache.has(url)) return [url, cache.get(url).source ?? ""];
-        const response = await session.request(url);
-        if (!response.ok) throw new Error(`RNGdle asset returned HTTP ${response.status}`);
-        const source = await responseText(response);
-        cache.set(url, { source });
-        if (cache.size > 96) cache.delete(cache.keys().next().value);
-        return [url, source];
+        const { source } = await scriptMetadata(session, url);
+        return source;
       }));
-      for (const [url, source] of sources) {
+      for (const source of sources) {
         const actionId = findServerAction(source, actionName);
         if (actionId) {
           serverActionCache.set(cacheKey, { actionId, expiresAt: Date.now() + SERVER_ACTION_TTL_MS });

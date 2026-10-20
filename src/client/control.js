@@ -6,7 +6,6 @@ import PerfectScrollbar from 'perfect-scrollbar';
     const logScrollbar = createScrollbar(byId('log-panel'), { suppressScrollX:true, wheelPropagation:false });
     let activeView = 'overview';
     let mailRecipients = [];
-    let settingsLoaded = false;
     let csrfToken = null;
 
     async function request(url, options) {
@@ -49,7 +48,6 @@ import PerfectScrollbar from 'perfect-scrollbar';
       document.querySelectorAll('.view').forEach((view) => { view.hidden = view.id !== 'view-' + name; });
       document.querySelectorAll('.tab').forEach((tab) => { const selected = tab.dataset.view === name; tab.classList.toggle('active', selected); tab.setAttribute('aria-selected', String(selected)); });
       if (name === 'logs') loadLogs();
-      if (name === 'settings' && !settingsLoaded) loadSettings();
       byId('main-scroll').scrollTop=0;
       requestAnimationFrame(()=>mainScrollbar.update());
     }
@@ -124,25 +122,10 @@ import PerfectScrollbar from 'perfect-scrollbar';
       } catch (error) { panel.textContent=error.message; }
     }
 
-    function setInput(id, value) { byId(id).value = value ?? ''; }
-    async function loadSettings() {
-      try {
-        const data=await request('/api/settings');
-        setInput('timezone',data.timezone); setInput('schedule-time',data.scheduleTime); setInput('rngdle-retry-minutes',data.rngdleRetryMinutes); setInput('email-retry-minutes',data.emailRetryMinutes); setInput('poll-seconds',data.pollSeconds); setInput('http-timeout',data.httpTimeoutMs); setInput('control-url',data.controlPublicUrl);
-        byId('return-likes-enabled').checked=data.returnLikesEnabled; setInput('return-likes-poll-minutes',data.returnLikesPollMinutes); setInput('return-likes-max-per-day',data.returnLikesMaxPerDay); setInput('return-likes-lookback-days',data.returnLikesLookbackDays);
-        setInput('rngdle-email',data.rngdleEmail); setInput('smtp-username',data.smtpUsername); setInput('smtp-from',data.smtpFrom); setInput('sender-name',data.mailFromName); setInput('subject-prefix',data.mailSubjectPrefix); setInput('mail-to',data.mailTo);
-        setInput('smtp-host',data.smtpHost); setInput('smtp-port',data.smtpPort); byId('smtp-secure').checked=data.smtpSecure; byId('smtp-require-tls').checked=data.smtpRequireTls; byId('smtp-password').value=''; text('secret-state',data.hasSmtpPassword ? '(configured)' : '(missing)');
-        settingsLoaded=true;
-        mainScrollbar.update();
-      } catch (error) { text('settings-message',error.message); byId('settings-message').className='feedback error'; }
-    }
-
     document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click',()=>showView(tab.dataset.view)));
     byId('auth-form').addEventListener('submit',async(event)=>{ event.preventDefault(); const message=byId('auth-message'); message.className='feedback'; message.textContent=''; byId('auth-submit').disabled=true; try { const data=await request('/api/auth-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({link:byId('auth-link').value})}); message.textContent=data.message; byId('auth-link').value=''; } catch(error) { message.className='feedback error'; message.textContent=error.message; } await refreshOverview(); });
     byId('log-refresh').addEventListener('click',loadLogs); byId('log-level').addEventListener('change',loadLogs);
     byId('email-send').addEventListener('click',async()=>{ const recipients=mailRecipients.length ? mailRecipients.join(', ') : 'the configured recipients'; if(!window.confirm('Send the result email to '+recipients+'?')) return; const button=byId('email-send'); const message=byId('email-message'); button.disabled=true; button.textContent='Sending'; message.className='feedback email-feedback'; message.textContent=''; try { const data=await request('/api/email/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'result'})}); message.textContent=data.message; } catch(error) { message.className='feedback email-feedback error'; message.textContent=error.message; } finally { button.disabled=false; button.textContent='Send email'; } });
-    byId('settings-form').addEventListener('submit',async(event)=>{ event.preventDefault(); const message=byId('settings-message'); const save=byId('settings-save'); message.className='feedback'; message.textContent=''; save.disabled=true; const payload={timezone:byId('timezone').value,scheduleTime:byId('schedule-time').value,rngdleRetryMinutes:Number(byId('rngdle-retry-minutes').value),emailRetryMinutes:Number(byId('email-retry-minutes').value),pollSeconds:Number(byId('poll-seconds').value),httpTimeoutMs:Number(byId('http-timeout').value),controlPublicUrl:byId('control-url').value,returnLikesEnabled:byId('return-likes-enabled').checked,returnLikesPollMinutes:Number(byId('return-likes-poll-minutes').value),returnLikesMaxPerDay:Number(byId('return-likes-max-per-day').value),returnLikesLookbackDays:Number(byId('return-likes-lookback-days').value),rngdleEmail:byId('rngdle-email').value,smtpUsername:byId('smtp-username').value,smtpFrom:byId('smtp-from').value,mailFromName:byId('sender-name').value,mailSubjectPrefix:byId('subject-prefix').value,mailTo:byId('mail-to').value,smtpHost:byId('smtp-host').value,smtpPort:Number(byId('smtp-port').value),smtpSecure:byId('smtp-secure').checked,smtpRequireTls:byId('smtp-require-tls').checked,smtpAppPassword:byId('smtp-password').value}; try { const data=await request('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); message.textContent=data.message; settingsLoaded=false; await loadSettings(); await refreshOverview(); } catch(error) { message.className='feedback error'; message.textContent=error.message; } finally { save.disabled=false; } });
-    byId('password-save').addEventListener('click',async()=>{ const message=byId('password-message'); const button=byId('password-save'); message.className='feedback'; message.textContent=''; button.disabled=true; try { await request('/api/auth/password',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:byId('control-password').value,confirmation:byId('control-password-confirm').value})}); message.textContent='Password changed. Redirecting to sign in...'; setTimeout(()=>{ window.location.href='/login'; },500); } catch(error) { message.className='feedback error'; message.textContent=error.message; button.disabled=false; } });
     byId('logout-button').addEventListener('click',async()=>{ try { await request('/api/auth/logout',{method:'POST'}); } finally { window.location.href='/login'; } });
     window.addEventListener('resize',()=>{ mainScrollbar.update(); logScrollbar.update(); });
     setInterval(()=>{ refreshOverview(); if(activeView==='logs'&&byId('log-auto').checked) loadLogs(); },3000);

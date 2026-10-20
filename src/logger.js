@@ -3,10 +3,6 @@ import { AsyncLocalStorage } from "node:async_hooks";
 const sinks = new AsyncLocalStorage();
 export const withLogSink = (sink, operation) => sinks.run(sink, operation);
 
-const MAX_RECENT_LOGS = 250;
-const recentLogs = [];
-let nextLogId = 1;
-
 function serialize(fields) {
   if (!fields || Object.keys(fields).length === 0) return "";
   return ` ${JSON.stringify(fields)}`;
@@ -37,19 +33,9 @@ export function errorSummary(error, maxLength = 500) {
 export function log(level, message, fields = {}) {
   const timestamp = new Date().toISOString();
   const safeFields = sanitizedFields(fields);
-  const entry = { id: nextLogId++, timestamp, level, message, fields: safeFields };
+  const entry = { timestamp, level, message, fields: safeFields };
   sinks.getStore()?.(entry);
-  recentLogs.push(entry);
-  if (recentLogs.length > MAX_RECENT_LOGS) recentLogs.splice(0, recentLogs.length - MAX_RECENT_LOGS);
   const line = `${timestamp} ${level.toUpperCase()} ${message}${serialize(safeFields)}`;
   const output = level === "error" ? console.error : console.log;
   output(line);
-}
-
-export function getRecentLogs({ limit = 100, level = "all", after = 0 } = {}) {
-  const normalizedLimit = Math.max(1, Math.min(200, Number(limit) || 100));
-  return recentLogs
-    .filter((entry) => entry.id > Number(after || 0) && (level === "all" || entry.level === level))
-    .slice(-normalizedLimit)
-    .map((entry) => structuredClone(entry));
 }

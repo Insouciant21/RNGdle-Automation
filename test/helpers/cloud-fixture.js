@@ -13,10 +13,10 @@ export class MemoryStorage {
 
 export const fixtureConfig = {
   timezone: "Asia/Shanghai",
-  schedule: { time: "08:02", retryMinutes: 30, emailRetryMinutes: 1, pollSeconds: 30 },
+  schedule: { time: "08:02", retryMinutes: 30, emailRetryMinutes: 1 },
   rngdle: { baseUrl: "https://www.rngdle.com", email: "player@example.com" },
   http: { timeoutMs: 45000 },
-  control: { sessionDays: 7, publicUrl: "https://control.example.com", cookieSecure: true },
+  control: { sessionDays: 7, publicUrl: "https://control.example.com" },
   smtp: { host: "smtp.example.com", port: 465, secure: true, requireTls: false, authMode: "password", password: "smtp-private", username: "sender@example.com", from: "sender@example.com", to: ["receiver@example.com"] },
   mail: { fromName: "RNGdle Today", subjectPrefix: "[RNGdle]" },
   poem: { enabled: true, retryMinutes: 5 },

@@ -1,0 +1,41 @@
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { parseEnv } from "node:util";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+
+test("Worker initialization uses .dev.vars, keeps credentials private, and ignores .env", async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "rngdle-init-test-"));
+  context.after(() => fs.rm(directory, { recursive: true, force: true }));
+  await fs.copyFile(new URL("../wrangler.jsonc", import.meta.url), path.join(directory, "wrangler.jsonc"));
+  await fs.copyFile(new URL("../.dev.vars.example", import.meta.url), path.join(directory, ".dev.vars"));
+  await fs.writeFile(path.join(directory, ".env"), "SMTP_PASSWORD=unused-legacy-password\n");
+  const script = fileURLToPath(new URL("../scripts/cloudflare.mjs", import.meta.url));
+  const env = { PATH: process.env.PATH, MIGRATION_CREDENTIALS: path.join(directory, "credentials.json") };
+  const run = (...args) => spawnSync(process.execPath, [script, ...args], { cwd: directory, env, encoding: "utf8" });
+  const result = run("init", "https://control.example.com");
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stdout, /replace-with-smtp-password|unused-legacy-password/);
+  const read = async (file) => JSON.parse(await fs.readFile(path.join(directory, file), "utf8"));
+  const config = await read("data/cloudflare-config.json");
+  assert.equal(config.smtp.password, "replace-with-smtp-password");
+  assert.equal(config.smtp.from, config.smtp.username);
+  assert.equal(config.likes.pollMinutes, 60);
+  assert.equal(config.storage, undefined);
+  assert.deepEqual(Object.keys(config.control).sort(), ["publicUrl", "sessionDays"]);
+  const credentials = await read("credentials.json");
+  assert.equal(credentials.origin, "https://control.example.com");
+  assert.equal(credentials.token, "replace-with-a-random-32-byte-hex-string");
+  assert.equal((await fs.stat(path.join(directory, "data/cloudflare-secrets.json"))).mode & 0o777, 0o600);
+
+  const local = run("secrets", "--local");
+  assert.equal(local.status, 0, local.stderr);
+  const variables = parseEnv(await fs.readFile(path.join(directory, ".dev.vars"), "utf8"));
+  assert.equal(variables.CONTROL_PUBLIC_URL, "https://control.example.com");
+  assert.equal(variables.MIGRATION_TOKEN, credentials.token);
+  assert.equal(variables.CONFIG_JSON, undefined);
+  assert.equal(variables.CONTROL_PASSWORD, undefined);
+});

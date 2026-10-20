@@ -40,8 +40,9 @@ export function createReturnLikeState(now = new Date()) {
 }
 
 export function isReturnLikeState(value) {
-  return value?.version === STATE_VERSION && typeof value.initializedAt === "string"
-    && Array.isArray(value.processedIds) && value.actionsByDate && typeof value.actionsByDate === "object";
+  return value?.version === STATE_VERSION && Number.isFinite(Date.parse(value.initializedAt))
+    && Array.isArray(value.processedIds) && value.actionsByDate && typeof value.actionsByDate === "object"
+    && !Array.isArray(value.actionsByDate);
 }
 
 function utcDate(now) {
@@ -55,7 +56,7 @@ function pruneActions(actions, now) {
   }
 }
 
-export async function fetchSessionViewer(session) {
+async function fetchSessionViewer(session) {
   const response = await session.request("/api/auth/get-session", { headers: { Accept: "application/json" } });
   if (authenticationRequired(response)) throw new AuthenticationRequiredError();
   if (!response.ok) throw new Error(`RNGdle session endpoint returned HTTP ${response.status}`);
@@ -64,7 +65,7 @@ export async function fetchSessionViewer(session) {
   return { id: String(payload.user.id), displayName: String(payload.user.displayName) };
 }
 
-export async function fetchNotifications(session, limit = NOTIFICATION_LIMIT) {
+async function fetchNotifications(session, limit = NOTIFICATION_LIMIT) {
   const safeLimit = Math.max(1, Math.min(NOTIFICATION_LIMIT, Math.floor(Number(limit) || NOTIFICATION_LIMIT)));
   const response = await session.request(`/api/notifications?limit=${safeLimit}`, { headers: { Accept: "application/json" } });
   const payload = await jsonResponse(response, "RNGdle notifications endpoint");
@@ -75,7 +76,7 @@ export async function fetchNotifications(session, limit = NOTIFICATION_LIMIT) {
   };
 }
 
-export async function fetchLatestUserRoll(session, displayName) {
+async function fetchLatestUserRoll(session, displayName) {
   const response = await session.request(`/api/users/${encodeURIComponent(displayName)}/rolls?limit=1&offset=0`, {
     headers: { Accept: "application/json" },
   });
@@ -91,7 +92,7 @@ export async function fetchLatestUserRoll(session, displayName) {
   };
 }
 
-export async function fetchActivityHeartIds(session, activityId) {
+async function fetchActivityHeartIds(session, activityId) {
   const response = await session.request(`/api/activity/${encodeURIComponent(activityId)}/hearts`, {
     headers: { Accept: "application/json" },
   });
@@ -134,9 +135,11 @@ function markGroup(state, group, reason) {
 
 function groupNotifications(notifications, processed, initializedAt) {
   const groups = new Map();
+  const cutoff = Date.parse(initializedAt);
   for (const notification of notifications) {
     if (notification.type !== "heart_received" || processed.has(notification.id)) continue;
-    if (Date.parse(notification.createdAt) < Date.parse(initializedAt)) continue;
+    const createdAt = Date.parse(notification.createdAt);
+    if (!Number.isFinite(createdAt) || createdAt < cutoff) continue;
     const displayName = notification.actor?.displayName;
     if (typeof displayName !== "string" || !displayName) continue;
     if (!groups.has(displayName)) groups.set(displayName, { displayName, notifications: [] });
@@ -157,11 +160,8 @@ export async function processReturnLikes(config, state, dependencies = {}) {
   const getLatestRoll = dependencies.getLatestRoll ?? fetchLatestUserRoll;
   const getHeartIds = dependencies.getHeartIds ?? fetchActivityHeartIds;
   const setHeart = dependencies.toggleHeart ?? toggleHeart;
-  const initialized = !isReturnLikeState(state) || state.baselineCompleted !== true;
-
-  state.initializedAt ??= iso(now);
-  state.processedIds = Array.isArray(state.processedIds) ? state.processedIds : [];
-  state.actionsByDate = state.actionsByDate && typeof state.actionsByDate === "object" ? state.actionsByDate : {};
+  if (!isReturnLikeState(state)) Object.assign(state, createReturnLikeState(now));
+  const initialized = state.baselineCompleted !== true;
   state.lastError = null;
   pruneActions(state.actionsByDate, now);
 

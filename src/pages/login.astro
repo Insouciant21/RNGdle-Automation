@@ -1,9 +1,7 @@
 ---
 import AuthLayout from '../layouts/AuthLayout.astro';
-const migrationRequired = Astro.locals.session?.migrationRequired;
 ---
 <AuthLayout title="RNGdle Control sign in">
-{migrationRequired ? <main class="setup"><h1>Migration in progress</h1><p class="note">The existing Control account is being imported. Please return shortly.</p></main> : <>
 <main class="login">
     <h1>RNGdle Control</h1>
     <p>Private operations console</p>
@@ -14,6 +12,5 @@ const migrationRequired = Astro.locals.session?.migrationRequired;
       <div id="feedback" class="feedback" role="alert"></div>
     </form>
   </main>
-</>}
 </AuthLayout>
 <script>import '../client/login.js';</script>

@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 import { createControlAuth, parseCookies, sessionCookie, expiredSessionCookie } from "../control-auth.js";
 import { overviewPayload, newestDay } from "../control-data.js";
-import { publicSettings, saveRuntimeSettings } from "../settings.js";
 import { buildAuthenticationRequiredMessage, buildRollMessage, sendAuthenticationRequiredEmail, sendRollEmail, verifyMailTransport } from "../mail.js";
 import { createRngdleSession, isRngdleUrl } from "../rngdle-http.js";
 import { fetchHome, followAuthenticationLink } from "../rngdle.js";
@@ -12,7 +11,7 @@ import { errorSummary, log, withLogSink } from "../logger.js";
 import { workerConfig } from "./config.js";
 import { nextWake } from "./schedule.js";
 import { advanceWorkflow } from "./workflow.js";
-import { createReturnLikeState, processReturnLikes } from "../rngdle-likes.js";
+import { createReturnLikeState, isReturnLikeState, processReturnLikes } from "../rngdle-likes.js";
 
 const EMPTY_STATE = () => ({ version: 1, days: {} });
 const json = (data, status = 200, headers = {}) => Response.json(data, { status, headers: { "Cache-Control": "no-store", ...headers } });
@@ -61,18 +60,21 @@ export class AutomationService {
   async meta() { return await this.storage.get("meta") ?? { paused: true }; }
   async state() { return await this.storage.get("state") ?? EMPTY_STATE(); }
   async config() { return workerConfig(this.env, this.storage); }
+  async hasConfig() { try { await this.config(); return true; } catch { return false; } }
 
   async status() {
     const meta = await this.meta();
     if (meta.authenticated === false) return { state: "waiting", label: "Waiting for RNGdle login" };
-    if (!meta.importedAt && this.env.ALLOW_SETUP !== "true") return { state: "idle", label: "Waiting for migration" };
+    if (!(await this.storage.get("auth"))?.password && this.env.ALLOW_SETUP !== "true") {
+      return { state: "idle", label: "Waiting for Control setup" };
+    }
     if (meta.paused) return { state: "idle", label: "Automation paused" };
     return { state: "authenticated", label: "Authenticated" };
   }
 
   async schedule() {
     const meta = await this.meta();
-    if (meta.paused || meta.authenticated === false || !this.env.CONFIG_JSON) return this.storage.deleteAlarm();
+    if (meta.paused || meta.authenticated === false || !(await this.hasConfig())) return this.storage.deleteAlarm();
     const at = nextWake(await this.config(), await this.state(), new Date(), await this.storage.get("social"));
     await this.storage.setAlarm(at);
   }
@@ -121,7 +123,7 @@ export class AutomationService {
             await this.storage.put("meta", meta);
           }
         }
-        await this.returnLikes(config, now);
+        if (meta.authenticated !== false) await this.returnLikes(config, now);
       } finally { await this.schedule(); }
     });
   }
@@ -150,8 +152,8 @@ export class AutomationService {
   async api(request, url) {
     const configured = Boolean((await this.storage.get("auth"))?.password);
     if (!configured && this.env.ALLOW_SETUP !== "true") {
-      if (url.pathname === "/api/auth/session") return json({ authenticated: false, configured: false, migrationRequired: true });
-      fail("Import the existing Control credentials before signing in", 503);
+      if (url.pathname === "/api/auth/session") return json({ authenticated: false, configured: false, setupDisabled: true });
+      fail("Set up Control credentials or restore a backup before signing in", 503);
     }
     const config = await this.config();
     const auth = await createControlAuth({ storage: this.storage, sessionDays: config.control.sessionDays });
@@ -173,27 +175,22 @@ export class AutomationService {
         try {
           const result = await auth.login(password, request.headers.get("cf-connecting-ip") ?? "local");
           return json({ authenticated: true, csrfToken: result.csrfToken, expiresAt: result.expiresAt }, 200,
-            { "Set-Cookie": sessionCookie(result.token, result.maxAgeSeconds, true) });
+            { "Set-Cookie": sessionCookie(result.token, result.maxAgeSeconds) });
         } catch (error) { return json({ message: errorSummary(error) }, error.message.startsWith("Too many") ? 429 : 401); }
       }
       case "POST /api/auth/setup": {
-        if (this.env.ALLOW_SETUP !== "true") fail("First-run setup is disabled for this migration", 403);
+        if (this.env.ALLOW_SETUP !== "true") fail("First-run setup is disabled", 403);
         const { password, confirmation } = await readJson(request);
         try {
           const result = await auth.setupPassword(password, confirmation);
           return json({ authenticated: true, configured: true, csrfToken: result.csrfToken, expiresAt: result.expiresAt }, 201,
-            { "Set-Cookie": sessionCookie(result.token, result.maxAgeSeconds, true) });
+            { "Set-Cookie": sessionCookie(result.token, result.maxAgeSeconds) });
         } catch (error) { fail(errorSummary(error), 409); }
         break;
       }
       case "POST /api/auth/logout":
         await auth.logout(token);
-        return json({ authenticated: false }, 200, { "Set-Cookie": expiredSessionCookie(true) });
-      case "PUT /api/auth/password": {
-        const { password, confirmation } = await readJson(request);
-        await auth.changePassword(password, confirmation);
-        return json({ message: "Control password changed. Sign in again." }, 200, { "Set-Cookie": expiredSessionCookie(true) });
-      }
+        return json({ authenticated: false }, 200, { "Set-Cookie": expiredSessionCookie() });
       case "GET /api/overview": return json(overviewPayload(config, await this.status(), await this.state()));
       case "GET /api/logs": {
         const level = url.searchParams.get("level") ?? "all";
@@ -201,18 +198,6 @@ export class AutomationService {
         const limit = Math.max(1, Math.min(200, Number(url.searchParams.get("limit")) || 100));
         const journal = await this.storage.get("logs");
         return json({ logs: (journal?.entries ?? []).filter((entry) => entry.id > Number(url.searchParams.get("after") ?? 0) && (level === "all" || entry.level === level)).slice(-limit) });
-      }
-      case "GET /api/settings": return json(publicSettings(config));
-      case "PUT /api/settings": {
-        const input = await readJson(request);
-        if (input.smtpPort === 25 || input.smtpPort === "25") fail("Workers cannot connect to SMTP port 25");
-        input.controlPublicUrl = this.env.CONTROL_PUBLIC_URL ?? config.control.publicUrl;
-        const likesWereEnabled = config.likes?.enabled === true;
-        const settings = await saveRuntimeSettings(config, input);
-        if (config.likes?.enabled && !likesWereEnabled) await this.storage.delete("social");
-        await this.schedule();
-        log("info", "Control settings updated");
-        return json({ message: "Settings saved and applied.", settings });
       }
       case "GET /preview/email": {
         const type = url.searchParams.get("type") ?? "result";
@@ -232,8 +217,8 @@ export class AutomationService {
         const selected = await this.selectedResult(date);
         if (type === "result" && !selected) fail("No roll result is available to send.", 404);
         try {
-          if (type === "authentication") await sendAuthenticationRequiredEmail(config);
-          else await sendRollEmail(config, selected.date, selected.day.result);
+          if (type === "authentication") await (this.dependencies.sendAuthentication ?? sendAuthenticationRequiredEmail)(config);
+          else await (this.dependencies.sendRoll ?? sendRollEmail)(config, selected.date, selected.day.result);
           log("info", "Control email sent", { type, date: selected?.date ?? null });
           return json({ message: `${type === "result" ? "Result" : "Login required"} email sent.`, type, date: selected?.date ?? null });
         } catch (error) { log("error", "Control email send failed", { error: errorSummary(error) }); fail(`Email send failed: ${errorSummary(error)}`, 502); }
@@ -277,8 +262,10 @@ export class AutomationService {
         latestStatus: latest?.day.status ?? null, nextAlarm: await this.storage.getAlarm(), configured: Boolean((await this.storage.get("auth"))?.password) });
     }
     if (request.method === "GET" && action === "export") {
-      return json({ version: 1, exportedAt: new Date().toISOString(), config: JSON.parse(this.env.CONFIG_JSON),
-        state: await this.state(), cookies: await this.storage.get("cookies"), settings: await this.storage.get("settings"),
+      const { storage: _storage, ...config } = await this.config();
+      return json({ version: 1, exportedAt: new Date().toISOString(), config,
+        state: await this.state(), cookies: await this.storage.get("cookies"),
+        social: await this.storage.get("social") ?? null,
         auth: { ...await this.storage.get("auth"), sessions: [], failures: {} }, meta: await this.meta() });
     }
     if (request.method !== "POST") return json({ message: "Not found" }, 404);
@@ -286,21 +273,24 @@ export class AutomationService {
       const data = await readJson(request, 2 * 1024 * 1024);
       if (data.version !== 1 || data.state?.version !== 1 || !data.state.days || Array.isArray(data.state.days) ||
           data.cookies?.version !== 1 || !data.cookies.cookies || data.auth?.version !== 1 || !data.auth.password ||
-          data.auth.password.algorithm !== "scrypt") fail("Unsupported migration bundle");
+          data.auth.password.algorithm !== "scrypt") fail("Unsupported backup format");
+      if (data.social != null && !isReturnLikeState(data.social)) fail("Unsupported return-like state");
       await this.storage.transaction(async (transaction) => {
         if ((await transaction.get("meta"))?.importedAt || await transaction.get("state") || (await transaction.get("auth"))?.password) fail("Import requires an empty target", 409);
         await transaction.put("state", data.state);
         await transaction.put("cookies", data.cookies);
-        if (data.settings) await transaction.put("settings", data.settings);
+        if (data.social != null) await transaction.put("social", data.social);
         await transaction.put("auth", { ...data.auth, sessions: [], failures: {} });
         await transaction.put("meta", { paused: true, importedAt: new Date().toISOString(), authenticated: null });
       });
-      log("info", "Legacy data imported", { days: Object.keys(data.state.days).length });
+      log("info", "Backup imported", { days: Object.keys(data.state.days).length });
       return json({ imported: true, days: Object.keys(data.state.days).length });
     }
     if (action === "pause" || action === "resume") {
       const meta = await this.meta();
-      if (action === "resume" && !meta.importedAt && this.env.ALLOW_SETUP !== "true") fail("Import data before enabling automation", 409);
+      if (action === "resume" && !(await this.storage.get("auth"))?.password) {
+        fail("Set up Control credentials or restore a backup before enabling automation", 409);
+      }
       meta.paused = action === "pause";
       await this.storage.put("meta", meta);
       await this.schedule();

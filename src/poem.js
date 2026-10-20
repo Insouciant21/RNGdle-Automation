@@ -164,7 +164,7 @@ function validateReview(review) {
 }
 
 export async function generatePoem(config, bank, { client } = {}) {
-  if (!config.llm?.apiKey) throw new Error("Configure llm_api_key before generating a poem");
+  if (!config.llm?.apiKey) throw new Error("Configure LLM_API_KEY before generating a poem");
   if (!bank.wordBank.length) throw new Error("RNGdle returned an empty word bank");
   const sdk = client ?? new OpenAI({
     apiKey: config.llm.apiKey,

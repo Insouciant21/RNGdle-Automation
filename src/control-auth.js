@@ -1,6 +1,4 @@
 import crypto from "node:crypto";
-import fs from "node:fs/promises";
-import path from "node:path";
 
 const AUTH_VERSION = 1;
 const PASSWORD_MIN_LENGTH = 8;
@@ -47,40 +45,21 @@ async function verifyPassword(password, stored) {
   return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
 }
 
-async function writeDocument(filePath, document) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  const temporaryPath = `${filePath}.${process.pid}.tmp`;
-  await fs.writeFile(temporaryPath, `${JSON.stringify(document, null, 2)}\n`, { mode: 0o600 });
-  await fs.chmod(temporaryPath, 0o600);
-  await fs.rename(temporaryPath, filePath);
-}
-
-async function readDocument(filePath) {
-  try {
-    return JSON.parse(await fs.readFile(filePath, "utf8"));
-  } catch (error) {
-    if (error.code === "ENOENT") return null;
-    throw new Error(`Unable to read Control authentication state: ${error.message}`);
-  }
-}
-
 function cleanSessions(document, now = Date.now()) {
   document.sessions = (Array.isArray(document.sessions) ? document.sessions : []).filter(
     (session) => typeof session?.tokenHash === "string" && Date.parse(session.expiresAt) > now,
   );
 }
 
-export async function createControlAuth({ authPath, initialPassword, sessionDays = 7, storage }) {
-  const read = () => storage ? storage.get("auth") : readDocument(authPath);
-  const write = (value) => storage ? storage.put("auth", value) : writeDocument(authPath, value);
-  let document = await read();
+export async function createControlAuth({ sessionDays = 7, storage }) {
+  let document = await storage.get("auth");
   if (!document) {
     document = {
       version: AUTH_VERSION,
-      password: initialPassword ? await hashPassword(passwordInput(initialPassword)) : null,
+      password: null,
       sessions: [],
     };
-    await write(document);
+    await storage.put("auth", document);
   }
   if (document.version !== AUTH_VERSION || (document.password !== null && !document.password)) {
     throw new Error("Unsupported Control authentication state format");
@@ -95,7 +74,7 @@ export async function createControlAuth({ authPath, initialPassword, sessionDays
       if (entry.resetAt <= Date.now()) failedAttempts.delete(address);
     }
     document.failures = Object.fromEntries(failedAttempts);
-    await write(document);
+    await storage.put("auth", document);
   }
 
   function rateLimitKey(address) {
@@ -177,15 +156,6 @@ export async function createControlAuth({ authPath, initialPassword, sessionDays
     await persist();
   }
 
-  async function changePassword(password, confirmation) {
-    if (!document.password) throw new Error("Control password has not been configured");
-    const nextPassword = passwordInput(password);
-    if (nextPassword !== confirmation) throw new Error("Control passwords do not match");
-    document.password = await hashPassword(nextPassword);
-    document.sessions = [];
-    await persist();
-  }
-
   return {
     isConfigured() {
       return Boolean(document.password);
@@ -193,16 +163,12 @@ export async function createControlAuth({ authPath, initialPassword, sessionDays
     login,
     setupPassword,
     session,
-    findSession,
     logout,
-    changePassword,
-    maxAgeSeconds,
-    passwordMinLength: PASSWORD_MIN_LENGTH,
   };
 }
 
 export function parseCookies(request) {
-  const header = request.headers.get?.("cookie") ?? request.headers.cookie ?? "";
+  const header = request.headers.get("cookie") ?? "";
   return Object.fromEntries(
     header
       .split(";")
@@ -212,18 +178,18 @@ export function parseCookies(request) {
   );
 }
 
-export function sessionCookie(token, maxAgeSeconds, secure = false) {
+export function sessionCookie(token, maxAgeSeconds) {
   const attributes = [
     `rngdle_control_session=${encodeURIComponent(token)}`,
     "Path=/",
     "HttpOnly",
     "SameSite=Lax",
+    "Secure",
     `Max-Age=${maxAgeSeconds}`,
   ];
-  if (secure) attributes.push("Secure");
   return attributes.join("; ");
 }
 
-export function expiredSessionCookie(secure = false) {
-  return sessionCookie("", 0, secure);
+export function expiredSessionCookie() {
+  return sessionCookie("", 0);
 }

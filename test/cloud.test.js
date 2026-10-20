@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AutomationService } from "../src/cloud/service.js";
+import { configToEnv } from "../src/cloud/config.js";
 import { advanceWorkflow } from "../src/cloud/workflow.js";
 import { nextReturnLikeWake, nextWake } from "../src/cloud/schedule.js";
 import { AuthenticationRequiredError } from "../src/rngdle.js";
 import { localParts } from "../src/schedule.js";
+import { createReturnLikeState } from "../src/rngdle-likes.js";
 
 import { MemoryStorage, fixtureConfig, bundle } from "./helpers/cloud-fixture.js";
 
@@ -105,7 +107,7 @@ test("alarms schedule across DST using real timezone instants", () => {
 
 test("import requires a bearer token and empty storage, preserving hash and clearing sessions", async () => {
   const { storage } = setup();
-  const service = new AutomationService(storage, { CONFIG_JSON: JSON.stringify(fixtureConfig), MIGRATION_TOKEN: "migration-private" });
+  const service = new AutomationService(storage, { ...configToEnv(fixtureConfig), MIGRATION_TOKEN: "migration-private", CONTROL_PUBLIC_URL: "https://control.example.com" });
   const data = await bundle();
   assert.equal((await service.fetch(request("/__migration/import", data))).status, 404);
   const headers = { Authorization: "Bearer migration-private" };
@@ -119,27 +121,54 @@ test("import requires a bearer token and empty storage, preserving hash and clea
   assert.match(login.headers.get("set-cookie"), /HttpOnly.*Secure/);
 });
 
-test("Control sessions, CSRF, settings, and logs survive service recreation", async () => {
+test("Control sessions, CSRF, and logs survive service recreation with config fixed to environment variables", async () => {
   const { storage } = setup();
-  const env = { CONFIG_JSON: JSON.stringify(fixtureConfig), MIGRATION_TOKEN: "migration-private", CONTROL_PUBLIC_URL: "https://control.example.com" };
+  const env = { ...configToEnv(fixtureConfig), MIGRATION_TOKEN: "migration-private", CONTROL_PUBLIC_URL: "https://control.example.com" };
   let service = new AutomationService(storage, env);
   await service.fetch(request("/__migration/import", await bundle(), { Authorization: "Bearer migration-private" }));
   const login = await service.fetch(request("/api/auth/login", { password: "control-test-password" }));
   const cookie = login.headers.get("set-cookie").split(";")[0];
   const session = await login.json();
-  const update = (headers) => new Request("https://control.example.com/api/settings", { method: "PUT", headers: { Cookie: cookie, "Content-Type": "application/json", ...headers }, body: JSON.stringify({ scheduleTime: "09:12", smtpAppPassword: "", controlPublicUrl: "https://old.invalid" }) });
-  assert.equal((await service.fetch(update({}))).status, 403);
-  assert.equal((await service.fetch(update({ "x-csrf-token": session.csrfToken, Origin: "https://evil.invalid" }))).status, 403);
-  assert.equal((await service.fetch(update({ "x-csrf-token": session.csrfToken }))).status, 200);
+  const authLink = (headers) => new Request("https://control.example.com/api/auth-link", { method: "POST", headers: { Cookie: cookie, "Content-Type": "application/json", ...headers }, body: JSON.stringify({ link: "https://www.rngdle.com/api/auth/magic-link/verify?token=x" }) });
+  assert.equal((await service.fetch(authLink({}))).status, 403);
+  assert.equal((await service.fetch(authLink({ "x-csrf-token": session.csrfToken, Origin: "https://evil.invalid" }))).status, 403);
+  const removed = (path) => new Request(`https://control.example.com${path}`, { method: "PUT", headers: { Cookie: cookie, "Content-Type": "application/json", "x-csrf-token": session.csrfToken }, body: "{}" });
+  assert.equal((await service.fetch(removed("/api/settings"))).status, 404);
+  assert.equal((await service.fetch(removed("/api/auth/password"))).status, 404);
+  assert.equal((await service.fetch(request("/__migration/pause", {}, { Authorization: "Bearer migration-private" }))).status, 200);
   service = new AutomationService(storage, env);
-  const response = await service.fetch(request("/api/settings", undefined, { Cookie: cookie }));
-  const settings = await response.json();
-  assert.equal(settings.scheduleTime, "09:12");
-  assert.equal(settings.controlPublicUrl, "https://control.example.com");
-  assert.equal(JSON.stringify(settings).includes("smtp-private"), false);
+  const overview = await (await service.fetch(request("/api/overview", undefined, { Cookie: cookie }))).json();
+  assert.equal(overview.schedule.time, fixtureConfig.schedule.time);
+  assert.equal(JSON.stringify(overview).includes("smtp-private"), false);
+  assert.equal(JSON.stringify(overview).includes("llm-private"), false);
   const logs = await (await service.fetch(request("/api/logs", undefined, { Cookie: cookie }))).json();
-  assert.ok(logs.logs.some((entry) => entry.message === "Control settings updated"));
+  assert.ok(logs.logs.some((entry) => entry.message === "Automation paused"));
   assert.equal((await service.config()).smtp.password, "smtp-private");
+});
+
+test("backups restore return-like history and daily limits without resetting the baseline", async () => {
+  const env = { ...configToEnv(fixtureConfig), MIGRATION_TOKEN: "migration-private", CONTROL_PUBLIC_URL: "https://control.example.com" };
+  const storage = new MemoryStorage();
+  const service = new AutomationService(storage, env);
+  const data = await bundle();
+  data.social = {
+    ...createReturnLikeState(new Date("2026-10-18T10:00:00Z")),
+    baselineCompleted: true,
+    processedIds: ["notification-already-liked"],
+    actionsByDate: { "2026-10-18": 3 },
+  };
+  const headers = { Authorization: "Bearer migration-private" };
+  assert.equal((await service.fetch(request("/__migration/import", data, headers))).status, 200);
+  const exported = await (await service.fetch(request("/__migration/export", undefined, headers))).json();
+  assert.deepEqual(exported.social, data.social);
+  const target = new MemoryStorage();
+  const restored = new AutomationService(target, env);
+  assert.equal((await restored.fetch(request("/__migration/import", exported, headers))).status, 200);
+  assert.deepEqual(await target.get("social"), data.social);
+
+  const invalid = new AutomationService(new MemoryStorage(), env);
+  data.social.initializedAt = "invalid";
+  assert.equal((await invalid.fetch(request("/__migration/import", data, headers))).status, 400);
 });
 
 test("concurrent alarms serialize and never generate a second roll", async () => {
@@ -147,7 +176,7 @@ test("concurrent alarms serialize and never generate a second roll", async () =>
   const config = structuredClone(fixtureConfig); config.schedule.time = "00:00"; config.poem.enabled = false;
   await storage.put("meta", { paused: false, importedAt: new Date().toISOString() });
   let rolls = 0;
-  const service = new AutomationService(storage, { CONFIG_JSON: JSON.stringify(config) }, {
+  const service = new AutomationService(storage, { ...configToEnv(config), CONTROL_PUBLIC_URL: "https://control.example.com" }, {
     getRoll: async () => { rolls++; await new Promise((resolve) => setTimeout(resolve, 15)); return { ...roll }; }, sendRoll: async () => ({ messageId: "concurrent" }),
   });
   await Promise.all([service.tick(), service.tick(), service.tick()]);
@@ -164,7 +193,7 @@ test("an alarm runs the return-like workflow without rerunning a completed daily
   await storage.put("state", { version: 1, days: { [today]: { status: "success" } } });
   await storage.put("meta", { paused: false, importedAt: new Date().toISOString() });
   let calls = 0;
-  const service = new AutomationService(storage, { CONFIG_JSON: JSON.stringify(config) }, {
+  const service = new AutomationService(storage, { ...configToEnv(config), CONTROL_PUBLIC_URL: "https://control.example.com" }, {
     getRoll: () => assert.fail("must not reroll a completed day"),
     processReturnLikes: async (_config, social) => {
       calls++;
@@ -179,7 +208,7 @@ test("an alarm runs the return-like workflow without rerunning a completed daily
 
 test("failed login limits remain enforced after object restart", async () => {
   const { storage } = setup();
-  const env = { CONFIG_JSON: JSON.stringify(fixtureConfig), MIGRATION_TOKEN: "migration-private" };
+  const env = { ...configToEnv(fixtureConfig), MIGRATION_TOKEN: "migration-private", CONTROL_PUBLIC_URL: "https://control.example.com" };
   let service = new AutomationService(storage, env);
   await service.fetch(request("/__migration/import", await bundle(), { Authorization: "Bearer migration-private" }));
   for (let i = 0; i < 5; i++) assert.equal((await service.fetch(request("/api/auth/login", { password: "incorrect" }))).status, 401);
@@ -190,9 +219,87 @@ test("failed login limits remain enforced after object restart", async () => {
 test("authentication-required automation stays asleep across dates and object restarts", async () => {
   const { storage } = setup();
   await storage.put("meta", { paused: false, authenticated: false, importedAt: new Date().toISOString() });
-  const service = new AutomationService(storage, { CONFIG_JSON: JSON.stringify(fixtureConfig) }, { getRoll: () => assert.fail("must wait for authentication") });
+  const service = new AutomationService(storage, { ...configToEnv(fixtureConfig) }, { getRoll: () => assert.fail("must wait for authentication") });
   await service.schedule();
   assert.equal(await storage.getAlarm(), null);
   await service.tick();
   assert.equal(await storage.get("state"), undefined);
+});
+
+test("individual environment variables round-trip through the config and missing ones fail validation", async () => {
+  const { storage } = setup();
+  const env = { ...configToEnv(fixtureConfig), CONTROL_PUBLIC_URL: "https://control.example.com" };
+  const config = await new AutomationService(storage, env).config();
+  assert.equal(config.timezone, fixtureConfig.timezone);
+  assert.equal(config.schedule.retryMinutes, fixtureConfig.schedule.retryMinutes);
+  assert.equal(config.schedule.emailRetryMinutes, fixtureConfig.schedule.emailRetryMinutes);
+  assert.equal(config.smtp.secure, fixtureConfig.smtp.secure);
+  assert.equal(config.smtp.requireTls, fixtureConfig.smtp.requireTls);
+  assert.equal(config.smtp.password, fixtureConfig.smtp.password);
+  assert.equal(config.llm.apiKey, fixtureConfig.llm.apiKey);
+  assert.deepEqual(config.smtp.to, fixtureConfig.smtp.to);
+  assert.equal(config.likes.pollMinutes, fixtureConfig.likes.pollMinutes);
+  assert.equal(config.control.publicUrl, "https://control.example.com");
+  assert.deepEqual(Object.keys(config.control).sort(), ["publicUrl", "sessionDays"]);
+
+  const partial = new AutomationService(storage, { CONTROL_PUBLIC_URL: "https://control.example.com" });
+  assert.equal(await partial.hasConfig(), false);
+  await assert.rejects(() => partial.config(), /smtp\.to must contain at least one recipient/);
+  await assert.rejects(() => new AutomationService(storage, configToEnv(fixtureConfig)).config(), /CONTROL_PUBLIC_URL is required/);
+  await assert.rejects(() => new AutomationService(storage, { ...env, CONTROL_PUBLIC_URL: "invalid" }).config(), /Invalid timezone or URL/);
+});
+
+test("an expired daily session prevents a return-like check in the same alarm", async () => {
+  const storage = new MemoryStorage();
+  const config = structuredClone(fixtureConfig);
+  config.schedule.time = "00:00";
+  config.likes.enabled = true;
+  await storage.put("meta", { paused: false, importedAt: new Date().toISOString() });
+  const service = new AutomationService(storage, { ...configToEnv(config), CONTROL_PUBLIC_URL: "https://control.example.com" }, {
+    getRoll: async () => { throw new AuthenticationRequiredError(); },
+    sendAuthentication: async () => {},
+    processReturnLikes: () => assert.fail("must wait for a new session"),
+  });
+  await service.tick();
+  assert.equal((await storage.get("meta")).authenticated, false);
+  assert.equal(await storage.getAlarm(), null);
+});
+
+test("a fresh Worker can enable automation after first-run setup without importing a backup", async () => {
+  const storage = new MemoryStorage();
+  const env = { ...configToEnv(fixtureConfig), CONTROL_PUBLIC_URL: "https://control.example.com", MIGRATION_TOKEN: "private-management-token", ALLOW_SETUP: "true" };
+  let service = new AutomationService(storage, env);
+  const headers = { Authorization: "Bearer private-management-token" };
+  assert.equal((await service.fetch(request("/__migration/resume", {}, headers))).status, 409);
+  assert.equal((await service.fetch(request("/api/auth/setup", {
+    password: "control-test-password", confirmation: "control-test-password",
+  }))).status, 201);
+  service = new AutomationService(storage, { ...env, ALLOW_SETUP: "false" });
+  assert.equal((await service.fetch(request("/api/auth/login", { password: "control-test-password" }))).status, 200);
+  assert.equal((await service.fetch(request("/__migration/resume", {}, headers))).status, 200);
+  assert.equal((await service.status()).state, "authenticated");
+  assert.ok(await storage.getAlarm());
+  assert.equal((await storage.get("meta")).importedAt, undefined);
+});
+
+test("a locked fresh Worker reports setup disabled instead of a migration requirement", async () => {
+  const service = new AutomationService(new MemoryStorage(), { ALLOW_SETUP: "false" });
+  const session = await (await service.fetch(request("/api/auth/session"))).json();
+  assert.deepEqual(session, { authenticated: false, configured: false, setupDisabled: true });
+  assert.equal((await service.status()).label, "Waiting for Control setup");
+});
+
+test("the Worker keeps only the latest 45 daily records", async () => {
+  const { config, storage } = setup();
+  const state = empty();
+  const today = "2026-10-18";
+  for (let offset = 1; offset <= 50; offset++) {
+    const date = new Date(Date.parse(today) - offset * 86_400_000).toISOString().slice(0, 10);
+    state.days[date] = { status: "success" };
+  }
+  await advanceWorkflow(config, state, today, { getRoll: async () => ({ ...roll }) });
+  const saved = await storage.get("state");
+  assert.equal(Object.keys(saved.days).length, 45);
+  assert.equal(saved.days[today].result.number, roll.number);
+  assert.equal(saved.days["2026-09-03"], undefined);
 });

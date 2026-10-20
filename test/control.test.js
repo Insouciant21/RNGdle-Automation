@@ -1,192 +1,67 @@
 import assert from "node:assert/strict";
-import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import test from "node:test";
-import { createControlServer, isAllowedAuthenticationLink } from "../src/control.js";
+import { AutomationService } from "../src/cloud/service.js";
+import { configToEnv } from "../src/cloud/config.js";
+import { MemoryStorage, fixtureConfig, bundle } from "./helpers/cloud-fixture.js";
 
-test("authentication control accepts only HTTPS RNGdle links", () => {
-  const base = "https://www.rngdle.com";
-  assert.equal(isAllowedAuthenticationLink("https://www.rngdle.com/api/auth/magic-link/verify?token=x", base), true);
-  assert.equal(isAllowedAuthenticationLink("https://rngdle.com/api/auth/magic-link/verify?token=x", base), true);
-  assert.equal(isAllowedAuthenticationLink("https://auth.rngdle.com/verify?token=x", base), true);
-  assert.equal(isAllowedAuthenticationLink("http://www.rngdle.com/verify", base), false);
-  assert.equal(isAllowedAuthenticationLink("https://rngdle.com.example.org/verify", base), false);
-});
-
-test("control APIs expose operations without exposing secrets", async (context) => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "rngdle-control-"));
-  context.after(() => fs.rm(directory, { recursive: true, force: true }));
-  const statePath = path.join(directory, "state.json");
-  await fs.writeFile(
-    statePath,
-    JSON.stringify({
-      version: 1,
-      days: {
-        "2026-07-29": {
-          status: "success",
-          attempts: 1,
-          emailSentAt: "2026-07-29T00:03:00.000Z",
-          result: { number: 123456, earnedEp: 42, totalEp: 900, badges: [] },
-        },
-      },
-    }),
-  );
-  const config = {
-    timezone: "Asia/Shanghai",
-    schedule: { time: "08:02", retryMinutes: 30, pollSeconds: 30 },
-    rngdle: { baseUrl: "https://www.rngdle.com", email: "player@example.com" },
-    http: { timeoutMs: 45_000 },
-    control: { port: 0, publicUrl: "http://localhost:3000", initialPassword: "test-control-password", sessionDays: 7, cookieSecure: false },
-    smtp: {
-      host: "smtp.example.com",
-      port: 587,
-      secure: false,
-      requireTls: true,
-      authMode: "password",
-      username: "sender@example.com",
-      password: "never-return-this",
-      from: "sender@example.com",
-      to: ["receiver@example.com"],
-    },
-    mail: { fromName: "RNGdle Today", subjectPrefix: "[RNGdle]" },
-    storage: { statePath, settingsPath: path.join(directory, "settings.json"), controlAuthPath: path.join(directory, "control-auth.json") },
-  };
+async function setup() {
+  const storage = new MemoryStorage();
   const sent = [];
-  const control = await createControlServer(config, {
-    sendRoll: async (_config, date, result) => {
-      sent.push({ type: "result", date, number: result.number });
-      return { messageId: "test-result" };
-    },
-    sendAuthentication: async () => {
-      sent.push({ type: "authentication" });
-      return { messageId: "test-authentication" };
-    },
+  const service = new AutomationService(storage, {
+    ...configToEnv(fixtureConfig), CONTROL_PUBLIC_URL: "https://control.example.com", MIGRATION_TOKEN: "private-management-token",
+  }, {
+    sendRoll: async (_config, date, result) => { sent.push({ type: "result", date, number: result.number }); },
+    sendAuthentication: async () => { sent.push({ type: "authentication" }); },
   });
-  context.after(() => control.close());
-  const baseUrl = `http://127.0.0.1:${control.address().port}`;
-
-  const unauthenticated = await fetch(baseUrl, { redirect: "manual" });
-  assert.equal(unauthenticated.status, 302);
-  assert.equal(unauthenticated.headers.get("location"), "/login");
-  const loginPage = await (await fetch(`${baseUrl}/login`)).text();
-  assert.match(loginPage, /Control password/);
-  const publicSession = await (await fetch(`${baseUrl}/api/auth/session`)).json();
-  assert.equal(publicSession.authenticated, false);
-  const protectedOverview = await fetch(`${baseUrl}/api/overview`);
-  assert.equal(protectedOverview.status, 401);
-  const login = await fetch(`${baseUrl}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Origin: baseUrl },
-    body: JSON.stringify({ password: "test-control-password" }),
-  });
-  assert.equal(login.status, 200);
-  const loginData = await login.json();
-  const cookie = login.headers.get("set-cookie").split(";", 1)[0];
-  const csrfToken = loginData.csrfToken;
-  const authorizedFetch = (path, options = {}) => {
-    const method = (options.method ?? "GET").toUpperCase();
-    const headers = {
-      Cookie: cookie,
-      ...(method !== "GET" && method !== "HEAD" ? { "X-CSRF-Token": csrfToken } : {}),
-      ...(options.headers ?? {}),
-    };
-    return fetch(`${baseUrl}${path}`, { ...options, headers });
+  const request = (path, options = {}) => service.fetch(new Request(`https://control.example.com${path}`, options));
+  const data = await bundle();
+  data.state.days["2026-10-18"] = {
+    status: "success", emailSentAt: "2026-10-18T00:05:00Z",
+    result: { number: 123456, earnedEp: 42, totalEp: 900, badges: [] },
   };
+  assert.equal((await request("/__migration/import", {
+    method: "POST", headers: { Authorization: "Bearer private-management-token" }, body: JSON.stringify(data),
+  })).status, 200);
+  const login = await request("/api/auth/login", { method: "POST", body: JSON.stringify({ password: "control-test-password" }) });
+  const cookie = login.headers.get("set-cookie").split(";")[0];
+  const { csrfToken } = await login.json();
+  const authorized = (path, options = {}) => request(path, {
+    ...options, headers: { Cookie: cookie, "X-CSRF-Token": csrfToken, ...options.headers },
+  });
+  return { request, authorized, sent };
+}
 
-  const page = await (await authorizedFetch("/")).text();
-  assert.match(page, /@font-face/);
-  assert.match(page, /\/assets\/fonts\/inter-latin\.woff2/);
-  assert.match(page, /id="email-send"/);
-  assert.match(page, /Send email/);
-  assert.match(page, /RNGdle retry minutes/);
-  assert.match(page, /Email retry minutes/);
-  assert.doesNotMatch(page, /Login required/);
-  assert.doesNotMatch(page, /data-email-type="authentication"/);
-  assert.match(page, /data-view="auth"/);
-  assert.doesNotMatch(page, /data-view="email"/);
-  assert.match(page, /perfect-scrollbar\.min\.js/);
-  assert.match(page, /new window\.PerfectScrollbar\(element, options\)/);
-  assert.match(page, /: \{ update\(\) \{\} \}/);
-  assert.match(page, /\.log-panel \{ contain:paint;/);
-  assert.match(page, /id="preview-open"/);
-  assert.doesNotMatch(page, /id="email-frame"/);
-  assert.match(page, /\.main-scroll\.ps,\.log-panel\.ps \{ overflow:hidden !important; \}/);
-  assert.match(page, /<header class="topbar">[\s\S]*<nav class="tabs"[\s\S]*<\/header>/);
-  assert.doesNotMatch(page, /tabs-wrap/);
-  const font = await authorizedFetch("/assets/fonts/space-mono-700-latin.woff2");
-  assert.equal(font.status, 200);
-  assert.equal(font.headers.get("content-type"), "font/woff2");
-  assert.ok((await font.arrayBuffer()).byteLength > 1_000);
-  const scrollbarScript = await authorizedFetch("/assets/vendor/perfect-scrollbar.min.js");
-  assert.equal(scrollbarScript.status, 200);
-  assert.match(scrollbarScript.headers.get("content-type"), /text\/javascript/);
-  assert.ok((await scrollbarScript.arrayBuffer()).byteLength > 10_000);
-  const scrollbarStyles = await authorizedFetch("/assets/vendor/perfect-scrollbar.css");
-  assert.equal(scrollbarStyles.status, 200);
-  assert.match(scrollbarStyles.headers.get("content-type"), /text\/css/);
-
-  const overview = await (await authorizedFetch("/api/overview")).json();
+test("Worker control APIs expose results and previews without exposing credentials", async () => {
+  const { request, authorized, sent } = await setup();
+  assert.equal((await request("/api/overview")).status, 401);
+  const overview = await (await authorized("/api/overview")).json();
   assert.equal(overview.result.number, 123456);
   assert.equal(overview.result.rarity, "trash");
-  assert.deepEqual(overview.result.badges, []);
   assert.equal(overview.latest.emailSent, true);
-
-  const settings = await (await authorizedFetch("/api/settings")).json();
-  assert.equal(settings.hasSmtpPassword, true);
-  assert.equal(settings.mailFromName, "RNGdle Today");
-  assert.equal(settings.rngdleRetryMinutes, 30);
-  assert.equal(settings.emailRetryMinutes, 1);
-  assert.equal("smtpAppPassword" in settings, false);
-  assert.doesNotMatch(JSON.stringify(settings), /never-return-this/);
-
-  const rejected = await authorizedFetch("/api/settings", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Origin: "https://example.org" },
-    body: JSON.stringify(settings),
-  });
-  assert.equal(rejected.status, 403);
-
-  const updated = await authorizedFetch("/api/settings", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Origin: baseUrl },
-    body: JSON.stringify({ ...settings, scheduleTime: "09:30", smtpAppPassword: "" }),
-  });
-  assert.equal(updated.status, 200);
-  assert.equal(config.schedule.time, "09:30");
-
-  const preview = await authorizedFetch("/preview/email?type=result");
+  assert.doesNotMatch(JSON.stringify(overview), /smtp-private|llm-private|private-management-token/);
+  const preview = await authorized("/preview/email?type=result");
   assert.equal(preview.status, 200);
   assert.match(preview.headers.get("content-security-policy"), /default-src 'none'/);
   assert.match(await preview.text(), /123456/);
+  assert.equal((await authorized("/preview/email?type=unknown")).status, 400);
+  for (const type of ["result", "authentication"]) {
+    assert.equal((await authorized("/api/email/send", { method: "POST", body: JSON.stringify({ type }) })).status, 200);
+  }
+  assert.deepEqual(sent, [{ type: "result", date: "2026-10-18", number: 123456 }, { type: "authentication" }]);
+  assert.equal((await authorized("/api/email/send", {
+    method: "POST", headers: { Origin: "https://evil.invalid" }, body: "{}",
+  })).status, 403);
+});
 
-  const invalidPreview = await authorizedFetch("/preview/email?type=unknown");
-  assert.equal(invalidPreview.status, 400);
-
-  const rejectedEmail = await authorizedFetch("/api/email/send", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Origin: "https://example.org" },
-    body: JSON.stringify({ type: "result" }),
-  });
-  assert.equal(rejectedEmail.status, 403);
-
-  const resultEmail = await authorizedFetch("/api/email/send", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Origin: baseUrl },
-    body: JSON.stringify({ type: "result" }),
-  });
-  assert.equal(resultEmail.status, 200);
-  assert.deepEqual(sent.at(-1), { type: "result", date: "2026-07-29", number: 123456 });
-
-  const authenticationEmail = await authorizedFetch("/api/email/send", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Origin: baseUrl },
-    body: JSON.stringify({ type: "authentication" }),
-  });
-  assert.equal(authenticationEmail.status, 200);
-  assert.deepEqual(sent.at(-1), { type: "authentication" });
-
-  const logs = await (await authorizedFetch("/api/logs?level=info")).json();
-  assert.ok(logs.logs.some((entry) => entry.message === "Control page started"));
-  assert.ok(logs.logs.some((entry) => entry.message === "Control email sent"));
+test("Worker authentication links and email requests reject invalid input", async () => {
+  const { authorized, sent } = await setup();
+  for (const link of [
+    "http://www.rngdle.com/verify", "https://rngdle.com.evil.invalid/verify",
+    "https://user:password@www.rngdle.com/verify", "https://untrusted.invalid/verify",
+  ]) assert.equal((await authorized("/api/auth-link", { method: "POST", body: JSON.stringify({ link }) })).status, 400);
+  for (const body of [{ type: "unknown" }, { date: "invalid" }]) {
+    assert.equal((await authorized("/api/email/send", { method: "POST", body: JSON.stringify(body) })).status, 400);
+  }
+  assert.equal((await authorized("/api/email/send", { method: "POST", body: JSON.stringify({ date: "2000-01-01" }) })).status, 404);
+  assert.deepEqual(sent, []);
 });

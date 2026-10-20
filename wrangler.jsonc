@@ -11,7 +11,32 @@
   "limits": { "cpu_ms": 30000 },
   "vars": {
     "CONTROL_PUBLIC_URL": "https://your-worker-name.your-subdomain.workers.dev",
-    "ALLOW_SETUP": "true"
+    "ALLOW_SETUP": "true",
+    "TZ": "Asia/Shanghai",
+    "SCHEDULE_TIME": "08:02",
+    "RETRY_MINUTES": "30",
+    "EMAIL_RETRY_MINUTES": "1",
+    "HTTP_TIMEOUT_MS": "45000",
+    "CONTROL_SESSION_DAYS": "7",
+    "RNGDLE_BASE_URL": "https://www.rngdle.com",
+    "SMTP_PORT": "587",
+    "SMTP_SECURE": "false",
+    "SMTP_REQUIRE_TLS": "true",
+    "SMTP_AUTH_MODE": "password",
+    "MAIL_FROM_NAME": "RNGdle Today",
+    "MAIL_SUBJECT_PREFIX": "[RNGdle]",
+    "POEM_ENABLED": "false",
+    "POEM_RETRY_MINUTES": "5",
+    "RETURN_LIKES_ENABLED": "false",
+    "RETURN_LIKES_POLL_MINUTES": "60",
+    "RETURN_LIKES_MAX_PER_DAY": "10",
+    "RETURN_LIKES_LOOKBACK_DAYS": "7",
+    "LLM_ENDPOINT": "https://api.deepseek.com",
+    "LLM_MODEL": "deepseek-flash",
+    "LLM_TIMEOUT_MS": "60000",
+    "LLM_MAX_TOKENS": "2048",
+    "LLM_MAX_ATTEMPTS": "3",
+    "LLM_THINKING": "disabled"
   },
   "durable_objects": {
     "bindings": [{ "name": "AUTOMATION", "class_name": "Automation" }]

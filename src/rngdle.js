@@ -1,4 +1,4 @@
-import { errorSummary, log } from "./logger.js";
+import { log } from "./logger.js";
 import { badgeRarity, cardRarity, normalizeRarity } from "./rarity.js";
 import { AuthenticationRequiredError, callServerAction, createRngdleSession, isRngdleUrl, responseText } from "./rngdle-http.js";
 import { discoverRngdleAssets } from "./rngdle-assets.js";
@@ -57,13 +57,6 @@ function resultForDay(home, gameDate) {
   return { ...home.lastRoll, totalEp: home.totalEp, gameDate };
 }
 
-export async function getExistingDailyRoll(config) {
-  const gameDate = utcDate();
-  const home = await fetchHome(await createRngdleSession(config));
-  if (!home.lastRoll) throw new Error("No roll exists today; run the daily workflow before composing a poem");
-  return resultForDay(home, gameDate);
-}
-
 export async function getDailyRoll(config) {
   const session = await createRngdleSession(config);
   const gameDate = utcDate();
@@ -103,43 +96,4 @@ export async function followAuthenticationLink(session, config, link) {
     return;
   }
   throw new Error("RNGdle login redirected too many times");
-}
-
-export async function waitForInteractiveAuthentication(config, control = null) {
-  const session = await createRngdleSession(config);
-  try {
-    await fetchHome(session);
-    log("info", "Existing RNGdle HTTP authentication is valid");
-    control?.setStatus("authenticated", "Authenticated");
-    return;
-  } catch (error) {
-    if (!(error instanceof AuthenticationRequiredError)) throw error;
-  }
-  let verifying = false;
-  let authenticated = false;
-  const onLine = async (line) => {
-    const link = line.trim();
-    if (!/^https:\/\//i.test(link) || verifying || authenticated) return;
-    verifying = true;
-    try {
-      await followAuthenticationLink(session, config, link);
-      authenticated = true;
-      log("info", "RNGdle HTTP authentication completed");
-      control?.setStatus("authenticated", "Authenticated");
-    } catch (error) {
-      log("error", "Could not verify the pasted authentication link", { error: errorSummary(error) });
-    } finally { verifying = false; }
-  };
-  process.stdin.setEncoding("utf8");
-  process.stdin.on("data", onLine);
-  const removeListener = control?.onLink(onLine);
-  try {
-    control?.setStatus("waiting", "Waiting for RNGdle login");
-    log("info", "Waiting for RNGdle magic-link authentication", { control: config.control.publicUrl });
-    console.log(`Open ${config.control.publicUrl} and submit the RNGdle magic-link URL, or paste it here.`);
-    while (!authenticated) await new Promise((resolve) => setTimeout(resolve, 500));
-  } finally {
-    removeListener?.();
-    process.stdin.off("data", onLine);
-  }
 }

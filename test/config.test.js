@@ -1,107 +1,91 @@
 import assert from "node:assert/strict";
-import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import test from "node:test";
-import { loadConfig } from "../src/config.js";
+import { workerConfig } from "../src/cloud/config.js";
+import { MemoryStorage } from "./helpers/cloud-fixture.js";
 
-test("loads YAML and expands secret environment variables", async (context) => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "rngdle-config-"));
-  context.after(() => fs.rm(directory, { recursive: true, force: true }));
-  const configPath = path.join(directory, "config.yaml");
-  await fs.writeFile(
-    configPath,
-    `rngdle:\n  email: login@example.com\nsmtp:\n  host: smtp.example.com\n  port: 465\n  username: sender@example.com\n  password: \"\${SMTP_PASSWORD}\"\n  from: sender@example.com\n  to: [receiver@example.com]\nstorage:\n  directory: ${directory}/data\n`,
-  );
-  const config = await loadConfig(configPath, { SMTP_PASSWORD: "secret" });
-  assert.equal(config.smtp.password, "secret");
-  assert.equal(config.smtp.authMode, "password");
-  assert.equal(config.schedule.time, "08:02");
-  assert.equal(config.schedule.retryMinutes, 30);
-  assert.equal(config.schedule.emailRetryMinutes, 1);
-  assert.equal(config.control.port, 3000);
-  assert.equal(config.mail.fromName, "RNGdle Today");
-  assert.deepEqual(config.likes, { enabled: false, pollMinutes: 60, maxPerDay: 10, lookbackDays: 7 });
-});
+const required = {
+  CONTROL_PUBLIC_URL: "https://control.example.com",
+  RNGDLE_EMAIL: "player@example.com",
+  SMTP_HOST: "smtp.example.com",
+  SMTP_USER: "sender@example.com",
+  SMTP_PASSWORD: "smtp-password",
+  MAIL_TO: "receiver@example.com",
+};
 
-test("loads generic SMTP settings from environment variables", async (context) => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "rngdle-config-"));
-  context.after(() => fs.rm(directory, { recursive: true, force: true }));
-  const configPath = path.join(directory, "config.yaml");
-  await fs.copyFile(path.resolve("config/default.yaml"), configPath);
-  const config = await loadConfig(configPath, {
-    RNGDLE_EMAIL: "player@outlook.com",
-    SMTP_USER: "sender@example.com",
-    SMTP_PASSWORD: "smtp-password",
-    MAIL_TO: "receiver@example.com",
-  });
-  assert.equal(config.smtp.host, "smtp.example.com");
+test("minimal Worker bindings use defaults and Durable Object storage", async () => {
+  const storage = new MemoryStorage();
+  const config = await workerConfig(required, storage);
+  assert.equal(config.timezone, "Asia/Shanghai");
+  assert.deepEqual(config.schedule, { time: "08:02", retryMinutes: 30, emailRetryMinutes: 1 });
+  assert.deepEqual(config.control, { publicUrl: required.CONTROL_PUBLIC_URL, sessionDays: 7 });
+  assert.deepEqual(config.storage, { adapter: storage });
+  assert.equal(config.http.timeoutMs, 45_000);
   assert.equal(config.smtp.port, 587);
   assert.equal(config.smtp.secure, false);
   assert.equal(config.smtp.requireTls, true);
-  assert.equal(config.schedule.emailRetryMinutes, 1);
-  assert.equal(config.smtp.authMode, "password");
-  assert.equal(config.smtp.password, "smtp-password");
-  assert.equal(config.smtp.from, "sender@example.com");
-  assert.equal(config.mail.fromName, "RNGdle Today");
-  assert.deepEqual(config.smtp.to, ["receiver@example.com"]);
+  assert.equal(config.smtp.from, required.SMTP_USER);
+  assert.deepEqual(config.smtp.to, [required.MAIL_TO]);
+  assert.deepEqual(config.likes, { enabled: false, pollMinutes: 60, maxPerDay: 10, lookbackDays: 7 });
+  assert.equal(config.poem.enabled, false);
 });
 
-test("accepts the legacy mail retry environment alias", async (context) => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "rngdle-config-"));
-  context.after(() => fs.rm(directory, { recursive: true, force: true }));
-  const configPath = path.join(directory, "config.yaml");
-  await fs.copyFile(path.resolve("config/default.yaml"), configPath);
-  const config = await loadConfig(configPath, {
-    RNGDLE_EMAIL: "player@outlook.com",
-    SMTP_USER: "sender@example.com",
-    SMTP_PASSWORD: "smtp-password",
-    MAIL_TO: "receiver@example.com",
-    MAIL_RETRY_MINUTES: "3",
-  });
-  assert.equal(config.schedule.emailRetryMinutes, 3);
+test("mail sender overrides and multiple recipients are normalized", async () => {
+  const config = await workerConfig({ ...required, MAIL_FROM: "other@example.com", MAIL_TO: "a@example.com, b@example.com", CONTROL_PUBLIC_URL: "https://control.example.com/" });
+  assert.equal(config.smtp.from, "other@example.com");
+  assert.deepEqual(config.smtp.to, ["a@example.com", "b@example.com"]);
+  assert.equal(config.control.publicUrl, required.CONTROL_PUBLIC_URL);
 });
 
-test("fails when a referenced environment variable is missing", async (context) => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "rngdle-config-"));
-  context.after(() => fs.rm(directory, { recursive: true, force: true }));
-  const configPath = path.join(directory, "config.yaml");
-  await fs.writeFile(configPath, 'smtp:\n  password: "${MISSING_SECRET}"\n');
-  await assert.rejects(() => loadConfig(configPath, {}), /Missing required environment variable: MISSING_SECRET/);
-});
-
-test("rejects password SMTP configuration without a credential", async (context) => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "rngdle-config-"));
-  context.after(() => fs.rm(directory, { recursive: true, force: true }));
-  const configPath = path.join(directory, "config.yaml");
-  await fs.copyFile(path.resolve("config/default.yaml"), configPath);
-  await assert.rejects(
-    () => loadConfig(configPath, { RNGDLE_EMAIL: "player@example.com", SMTP_USER: "sender@example.com", MAIL_TO: "receiver@example.com" }),
-    /smtp\.password is required/,
-  );
-});
-
-test("LLM lowercase environment variables take precedence and enabled poetry requires a key", async () => {
-  const env = { RNGDLE_EMAIL: "player@example.com", SMTP_USER: "sender@example.com", SMTP_PASSWORD: "smtp-secret", MAIL_TO: "receiver@example.com" };
-  const defaults = await loadConfig("config/default.yaml", env);
-  assert.equal(defaults.poem.enabled, false);
-  assert.equal(defaults.llm.model, "deepseek-flash");
-  await assert.rejects(loadConfig("config/default.yaml", { ...env, POEM_ENABLED: "true" }), /llm_api_key/);
-  const configured = await loadConfig("config/default.yaml", { ...env, POEM_ENABLED: "true", llm_api_key: "lowercase-key", LLM_API_KEY: "uppercase-key", llm_endpoint: "https://example.com/v1/", llm_model: "my-model" });
-  assert.equal(configured.llm.apiKey, "lowercase-key");
-  assert.equal(configured.llm.endpoint, "https://example.com/v1");
-  assert.equal(configured.llm.model, "my-model");
-  for (const extra of [{ llm_endpoint: "file:///tmp/model" }, { llm_endpoint: "https://user:password@example.com" }, { LLM_MAX_ATTEMPTS: "6" }, { LLM_THINKING: "maybe" }]) {
-    await assert.rejects(loadConfig("config/default.yaml", { ...env, ...extra }));
+test("missing required Worker bindings fail before a workflow can run", async () => {
+  for (const name of Object.keys(required)) {
+    await assert.rejects(workerConfig({ ...required, [name]: "" }), /required|non-empty|at least one recipient/);
   }
 });
 
-test("HTTP timeout accepts the legacy environment alias and cookies use the existing data directory", async () => {
-  const env = { RNGDLE_EMAIL: "player@example.com", SMTP_USER: "sender@example.com", SMTP_PASSWORD: "smtp-secret", MAIL_TO: "receiver@example.com", BROWSER_TIMEOUT_MS: "60000" };
-  const legacy = await loadConfig("config/default.yaml", env);
-  assert.equal(legacy.http.timeoutMs, 60_000);
-  assert.equal("browser" in legacy, false);
-  assert.equal("profileDirectory" in legacy.storage, false);
-  assert.equal(legacy.storage.cookiePath, path.join(legacy.storage.directory, "cookies.json"));
-  assert.equal((await loadConfig("config/default.yaml", { ...env, HTTP_TIMEOUT_MS: "30000" })).http.timeoutMs, 30_000);
+test("deployment variables validate types, schedules, timezones and URLs", async () => {
+  for (const extra of [
+    { SCHEDULE_TIME: "25:00" }, { TZ: "invalid" }, { HTTP_TIMEOUT_MS: "0" },
+    { RETURN_LIKES_POLL_MINUTES: "0" }, { POEM_ENABLED: "yes" }, { SMTP_PORT: "invalid" },
+    { CONTROL_PUBLIC_URL: "invalid" }, { RNGDLE_BASE_URL: "invalid" },
+  ]) await assert.rejects(workerConfig({ ...required, ...extra }));
+});
+
+test("legacy aliases and Node server settings no longer affect Worker configuration", async () => {
+  const config = await workerConfig({
+    ...required, BROWSER_TIMEOUT_MS: "90000", MAIL_RETRY_MINUTES: "10", llm_model: "old-model",
+    POLL_SECONDS: "1", CONTROL_PORT: "9000", CONTROL_PASSWORD: "unused-password", CONTROL_COOKIE_SECURE: "false",
+  });
+  assert.equal(config.http.timeoutMs, 45_000);
+  assert.equal(config.schedule.emailRetryMinutes, 1);
+  assert.equal(config.llm.model, "deepseek-flash");
+  assert.equal(config.schedule.pollSeconds, undefined);
+  assert.deepEqual(Object.keys(config.control).sort(), ["publicUrl", "sessionDays"]);
+  await assert.rejects(workerConfig({ ...required, SMTP_PASSWORD: "", SMTP_APP_PASSWORD: "legacy" }), /smtp.password is required/);
+});
+
+test("OAuth remains optional and does not require a password", async () => {
+  const env = {
+    ...required, SMTP_AUTH_MODE: "oauth2", SMTP_PASSWORD: "",
+    SMTP_OAUTH_CLIENT_ID: "client", SMTP_OAUTH_CLIENT_SECRET: "secret",
+    SMTP_OAUTH_REFRESH_TOKEN: "refresh", SMTP_OAUTH_ACCESS_URL: "https://auth.example.com/token",
+  };
+  const config = await workerConfig(env);
+  assert.equal(config.smtp.authMode, "oauth2");
+  assert.equal(config.smtp.password, null);
+  assert.equal(config.smtp.oauth.refreshToken, "refresh");
+  await assert.rejects(workerConfig({ ...env, SMTP_OAUTH_CLIENT_SECRET: "" }), /required for OAuth2/);
+});
+
+test("poetry uses uppercase LLM bindings and requires a secret when enabled", async () => {
+  await assert.rejects(workerConfig({ ...required, POEM_ENABLED: "true", llm_api_key: "legacy" }), /LLM_API_KEY/);
+  const config = await workerConfig({
+    ...required, POEM_ENABLED: "true", LLM_API_KEY: "key", LLM_ENDPOINT: "https://example.com/v1/", LLM_MODEL: "custom-model",
+  });
+  assert.equal(config.llm.endpoint, "https://example.com/v1");
+  assert.equal(config.llm.model, "custom-model");
+  assert.equal(config.llm.apiKey, "key");
+  for (const extra of [
+    { LLM_ENDPOINT: "file:///tmp/model" }, { LLM_ENDPOINT: "https://user:password@example.com" },
+    { LLM_MAX_ATTEMPTS: "6" }, { LLM_THINKING: "maybe" },
+  ]) await assert.rejects(workerConfig({ ...required, ...extra }));
 });

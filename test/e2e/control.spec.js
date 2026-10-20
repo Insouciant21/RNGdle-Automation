@@ -9,7 +9,7 @@ test.beforeAll(async ({ request }) => {
   expect(response.status()).toBe(200);
 });
 
-test("Workers runtime serves authenticated Astro views and persists settings", async ({ page }) => {
+test("Workers runtime serves authenticated Astro views without a settings page", async ({ page }) => {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
@@ -19,20 +19,10 @@ test("Workers runtime serves authenticated Astro views and persists settings", a
   await expect(page.locator("#roll-number")).toHaveText("123456");
   await expect(page.locator("#poem-text")).toHaveText("mountains rise");
   await page.getByRole("tab", { name: "Logs", exact: true }).click();
-  await expect(page.locator("#log-panel")).toContainText("Legacy data imported");
+  await expect(page.locator("#log-panel")).toContainText("Backup imported");
   await page.getByRole("tab", { name: "Authentication", exact: true }).click();
   await expect(page.locator("#rngdle-account")).toHaveText("player@example.com");
-  await page.getByRole("tab", { name: "Settings", exact: true }).click();
-  await expect(page.locator("#smtp-password")).toHaveValue("");
-  await expect(page.locator("#return-likes-enabled")).not.toBeChecked();
-  await expect(page.locator("#return-likes-poll-minutes")).toHaveValue("60");
-  await expect(page.locator("#return-likes-max-per-day")).toHaveValue("10");
-  await page.locator("#schedule-time").fill("09:13");
-  await page.getByRole("button", { name: "Save settings", exact: true }).click();
-  await expect(page.locator("#settings-message")).toHaveText("Settings saved and applied.");
-  await page.reload();
-  await page.getByRole("tab", { name: "Settings", exact: true }).click();
-  await expect(page.locator("#schedule-time")).toHaveValue("09:13");
+  await expect(page.getByRole("tab", { name: "Settings", exact: true })).toHaveCount(0);
   const preview = await page.context().request.get("/preview/email");
   expect(preview.status()).toBe(200);
   expect(await preview.text()).toContain("123456");
@@ -48,15 +38,21 @@ test("Workers runtime serves authenticated Astro views and persists settings", a
   expect(errors).toEqual([]);
 });
 
-test("Workers rejects missing CSRF and keeps deployment secrets private", async ({ request }) => {
+test("Workers rejects missing CSRF and removed endpoints, keeping deployment secrets private", async ({ request }) => {
   const login = await request.post("/api/auth/login", { data: { password: "control-test-password" } });
   expect(login.status()).toBe(200);
-  const response = await request.put("/api/settings", { data: { scheduleTime: "07:00" } });
-  expect(response.status()).toBe(403);
-  const settings = await request.get("/api/settings");
-  const text = await settings.text();
-  expect(text).not.toContain("smtp-private");
-  expect(text).not.toContain("llm-private");
+  const { csrfToken } = await login.json();
+  const noCsrf = await request.post("/api/email/send", { data: { type: "result" } });
+  expect(noCsrf.status()).toBe(403);
+  for (const removed of ["/api/settings", "/api/auth/password"]) {
+    const write = await request.put(removed, { headers: { "X-CSRF-Token": csrfToken }, data: {} });
+    expect(write.status()).toBe(404);
+  }
+  const overview = await request.get("/api/overview");
+  const overviewText = await overview.text();
+  expect(overviewText).not.toContain("smtp-private");
+  expect(overviewText).not.toContain("llm-private");
+  expect(overviewText).toContain("\"time\":\"08:02\"");
   const duplicate = await request.post("/__migration/import", { headers: { Authorization: "Bearer e2e-migration-token" }, data: await bundle() });
   expect(duplicate.status()).toBe(409);
   const oversized = await request.post("/api/auth/login", { data: { password: "x".repeat(40000) } });

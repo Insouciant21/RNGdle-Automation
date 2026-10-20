@@ -1,9 +1,9 @@
 ---
 import AuthLayout from '../layouts/AuthLayout.astro';
-const migrationRequired = Astro.locals.session?.migrationRequired;
+const setupDisabled = Astro.locals.session?.setupDisabled;
 ---
 <AuthLayout title="Set up RNGdle Control">
-{migrationRequired ? <main class="setup"><h1>Migration in progress</h1><p class="note">The existing Control account is being imported. Please return shortly.</p></main> : <>
+{setupDisabled ? <main class="setup"><h1>Control setup is disabled</h1><p class="note">Restore a backup or enable first-run setup to create a Control password.</p></main> : <>
 <main class="setup">
     <h1>Set up RNGdle Control</h1>
     <p>First-run access protection</p>

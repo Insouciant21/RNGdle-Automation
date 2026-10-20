@@ -34,7 +34,7 @@ function dependencies(notifications, overrides = {}) {
     now,
     session: {},
     getNotifications: async () => ({ notifications, unreadCount: notifications.length }),
-    getViewer: async () => ({ id: "viewer-id", displayName: "insouciant21" }),
+    getViewer: async () => ({ id: "viewer-id", displayName: "player" }),
     getLatestRoll: async () => ({
       activityId: "friend-activity",
       number: 123456,
@@ -112,7 +112,7 @@ test("an already hearted roll is skipped and resolved without toggling it off", 
 test("self likes and stale rolls are skipped", async () => {
   const state = readyState();
   const deps = dependencies([
-    notification("self-1", "insouciant21"),
+    notification("self-1", "player"),
     notification("stale-1", "old_friend"),
   ], {
     getLatestRoll: async (_session, displayName) => displayName === "old_friend" ? {
@@ -137,5 +137,46 @@ test("the daily cap leaves excess notifications pending for a later check", asyn
   const result = await processReturnLikes(limited, state, deps);
   assert.equal(result.limited, true);
   assert.equal(result.liked, 1);
+  assert.deepEqual(state.processedIds, ["new-1"]);
+});
+
+test("invalid notification dates cannot trigger a return-like", async () => {
+  const state = readyState();
+  const deps = dependencies([notification("invalid-date", "friend", "invalid")]);
+  const result = await processReturnLikes(config, state, deps);
+  assert.equal(result.liked, 0);
+  assert.equal(deps.calls.toggles.length, 0);
+  assert.deepEqual(state.processedIds, []);
+});
+
+test("an unsupported saved state records one fresh baseline before processing new hearts", async () => {
+  const state = readyState({ version: 0 });
+  const deps = dependencies([notification("old-1", "friend")]);
+  assert.equal((await processReturnLikes(config, state, deps)).baseline, true);
+  assert.equal(state.version, 1);
+  assert.equal((await processReturnLikes(config, state, deps)).baseline, false);
+  assert.equal(deps.calls.toggles.length, 0);
+});
+
+test("a lost successful heart response is recovered without toggling the heart off", async () => {
+  const state = readyState({ heartActionId: "cached", heartActionExpiresAt: "2026-10-18T13:00:00Z" });
+  let hearted = false;
+  let toggles = 0;
+  const deps = dependencies([notification("new-1", "friend")], {
+    getHeartIds: async () => new Set(hearted ? ["viewer-id"] : []),
+    toggleHeart: async () => {
+      toggles++;
+      hearted = true;
+      throw new Error("response lost");
+    },
+  });
+  await processReturnLikes(config, state, deps);
+  assert.deepEqual(state.processedIds, []);
+  assert.equal(state.heartActionId, null);
+  assert.equal(state.lastError, "response lost");
+  const result = await processReturnLikes(config, state, deps);
+  assert.equal(result.skipped, 1);
+  assert.equal(toggles, 1);
+  assert.equal(hearted, true);
   assert.deepEqual(state.processedIds, ["new-1"]);
 });

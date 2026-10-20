@@ -1,30 +1,3 @@
-import fs from "node:fs/promises";
-import path from "node:path";
-import YAML from "yaml";
-
-const ENV_PATTERN = /\$\{([A-Z_][A-Z0-9_]*)(:-([^}]*))?\}/g;
-
-function expandEnvironment(value, env) {
-  if (typeof value === "string") {
-    return value.replace(ENV_PATTERN, (_, name, defaultExpression, defaultValue) => {
-      if (!(name in env) || env[name] === "") {
-        if (defaultExpression) return defaultValue;
-        throw new Error(`Missing required environment variable: ${name}`);
-      }
-      return env[name];
-    });
-  }
-  if (Array.isArray(value)) {
-    return value.map((item) => expandEnvironment(item, env));
-  }
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, expandEnvironment(item, env)]),
-    );
-  }
-  return value;
-}
-
 function requiredString(value, field) {
   if (typeof value !== "string" || value.trim() === "") {
     throw new Error(`Configuration field ${field} must be a non-empty string`);
@@ -59,28 +32,8 @@ function validateTime(value) {
   return time;
 }
 
-export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./config/default.yaml", env = process.env) {
-  const absoluteConfigPath = path.resolve(configPath);
-  let source;
-  try {
-    source = await fs.readFile(absoluteConfigPath, "utf8");
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      throw new Error(`Configuration file not found: ${absoluteConfigPath}. Use the bundled config/default.yaml or set CONFIG_PATH.`);
-    }
-    throw error;
-  }
-
-  const expandedEnv = {
-    ...env,
-    LLM_ENDPOINT: env.llm_endpoint || env.LLM_ENDPOINT || "",
-    LLM_API_KEY: env.llm_api_key || env.LLM_API_KEY || "",
-    LLM_MODEL: env.llm_model || env.LLM_MODEL || "",
-    HTTP_TIMEOUT_MS: env.HTTP_TIMEOUT_MS || env.BROWSER_TIMEOUT_MS || "",
-    SMTP_PASSWORD: env.SMTP_PASSWORD || env.SMTP_APP_PASSWORD || "",
-    EMAIL_RETRY_MINUTES: env.EMAIL_RETRY_MINUTES || env.MAIL_RETRY_MINUTES || "",
-  };
-  const raw = expandEnvironment(YAML.parse(source), expandedEnv);
+// Validates and defaults the configuration built from Worker variables.
+export function normalizeConfig(raw) {
   const configuredRecipients = raw.smtp?.to;
   const recipients = Array.isArray(configuredRecipients)
     ? configuredRecipients
@@ -91,8 +44,7 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
     throw new Error("Configuration field smtp.to must contain at least one recipient");
   }
 
-  const storageDirectory = path.resolve(raw.storage?.directory ?? "./data");
-  const controlPublicUrl = requiredString(raw.control?.publicUrl ?? "http://localhost:3000", "control.publicUrl").replace(
+  const controlPublicUrl = requiredString(raw.control?.publicUrl, "control.publicUrl").replace(
     /\/$/,
     "",
   );
@@ -118,27 +70,23 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
       time: validateTime(raw.schedule?.time ?? "08:02"),
       retryMinutes: positiveInteger(raw.schedule?.retryMinutes ?? 30, "schedule.retryMinutes"),
       emailRetryMinutes: positiveInteger(raw.schedule?.emailRetryMinutes ?? 1, "schedule.emailRetryMinutes"),
-      pollSeconds: positiveInteger(raw.schedule?.pollSeconds ?? 30, "schedule.pollSeconds"),
     },
     rngdle: {
       baseUrl: requiredString(raw.rngdle?.baseUrl ?? "https://www.rngdle.com", "rngdle.baseUrl").replace(/\/$/, ""),
       email: requiredString(raw.rngdle?.email, "rngdle.email"),
     },
     http: {
-      timeoutMs: positiveInteger(raw.http?.timeoutMs ?? raw.browser?.timeoutMs ?? 45_000, "http.timeoutMs"),
+      timeoutMs: positiveInteger(raw.http?.timeoutMs ?? 45_000, "http.timeoutMs"),
     },
     control: {
-      port: positiveInteger(raw.control?.port ?? 3000, "control.port"),
       publicUrl: controlPublicUrl,
-      initialPassword: optionalString(raw.control?.password),
       sessionDays: positiveInteger(raw.control?.sessionDays ?? 7, "control.sessionDays"),
-      cookieSecure: booleanValue(raw.control?.cookieSecure ?? false, "control.cookieSecure"),
     },
     smtp: {
       host: requiredString(raw.smtp?.host, "smtp.host"),
-      port: positiveInteger(raw.smtp?.port, "smtp.port"),
-      secure: booleanValue(raw.smtp?.secure ?? true, "smtp.secure"),
-      requireTls: booleanValue(raw.smtp?.requireTls ?? false, "smtp.requireTls"),
+      port: positiveInteger(raw.smtp?.port ?? 587, "smtp.port"),
+      secure: booleanValue(raw.smtp?.secure ?? false, "smtp.secure"),
+      requireTls: booleanValue(raw.smtp?.requireTls ?? true, "smtp.requireTls"),
       username: smtpUsername,
       authMode: smtpAuthMode,
       password: smtpPassword,
@@ -174,14 +122,6 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
       maxAttempts: positiveInteger(raw.llm?.maxAttempts ?? 3, "llm.maxAttempts"),
       thinking: requiredString(raw.llm?.thinking ?? "disabled", "llm.thinking"),
     },
-    storage: {
-      directory: storageDirectory,
-      cookiePath: path.join(storageDirectory, "cookies.json"),
-      statePath: path.join(storageDirectory, "state.json"),
-      settingsPath: path.join(storageDirectory, "settings.json"),
-      controlAuthPath: path.join(storageDirectory, "control-auth.json"),
-      lockPath: path.join(storageDirectory, "workflow.lock"),
-    },
   };
 
   const llmUrl = new URL(config.llm.endpoint);
@@ -190,7 +130,7 @@ export async function loadConfig(configPath = process.env.CONFIG_PATH ?? "./conf
   }
   if (!new Set(["enabled", "disabled"]).has(config.llm.thinking)) throw new Error("llm.thinking must be enabled or disabled");
   if (config.llm.maxAttempts > 5) throw new Error("llm.maxAttempts must be at most 5");
-  if (config.poem.enabled && !config.llm.apiKey) throw new Error("llm_api_key is required when POEM_ENABLED=true");
+  if (config.poem.enabled && !config.llm.apiKey) throw new Error("LLM_API_KEY is required when POEM_ENABLED=true");
 
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: config.timezone }).format();

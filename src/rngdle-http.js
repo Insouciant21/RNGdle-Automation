@@ -1,6 +1,3 @@
-import fs from "node:fs/promises";
-import path from "node:path";
-
 export class AuthenticationRequiredError extends Error {
   constructor(message = "RNGdle authentication is required") {
     super(message);
@@ -20,13 +17,10 @@ export function isRngdleUrl(candidate, baseUrl) {
 }
 
 export async function createRngdleSession(config) {
-  const cookiePath = config.storage.adapter ? null
-    : config.storage.cookiePath ?? path.join(config.storage.directory, "cookies.json");
+  const storage = config.storage.adapter;
   const cookies = Object.create(null);
   try {
-    const document = config.storage.adapter
-      ? await config.storage.adapter.get("cookies") ?? { version: 1, cookies: {} }
-      : JSON.parse(await fs.readFile(cookiePath, "utf8"));
+    const document = await storage.get("cookies") ?? { version: 1, cookies: {} };
     if (document.version !== 1 || !document.cookies || typeof document.cookies !== "object" || Array.isArray(document.cookies)) {
       throw new Error("Unsupported cookie format");
     }
@@ -34,24 +28,14 @@ export async function createRngdleSession(config) {
       if (typeof value !== "string" || /[;\r\n]/.test(name + value)) throw new Error("Invalid cookie entry");
       cookies[name] = value;
     }
-  } catch (error) {
-    if (error.code !== "ENOENT") throw new Error("Unable to read RNGdle cookies.json");
+  } catch {
+    throw new Error("Unable to read RNGdle cookie storage");
   }
   // Serialize cookie writes when public assets are downloaded concurrently.
   let pendingWrite = Promise.resolve();
   function persist() {
-    if (config.storage.adapter) {
-      const document = { version: 1, cookies: { ...cookies } };
-      pendingWrite = pendingWrite.then(() => config.storage.adapter.put("cookies", document));
-      return pendingWrite;
-    }
-    const document = JSON.stringify({ version: 1, cookies }, null, 2) + "\n";
-    pendingWrite = pendingWrite.then(async () => {
-      await fs.mkdir(path.dirname(cookiePath), { recursive: true });
-      const temporary = `${cookiePath}.${process.pid}.tmp`;
-      await fs.writeFile(temporary, document, { mode: 0o600 });
-      await fs.rename(temporary, cookiePath);
-    });
+    const document = { version: 1, cookies: { ...cookies } };
+    pendingWrite = pendingWrite.then(() => storage.put("cookies", document));
     return pendingWrite;
   }
   async function request(candidate, options = {}) {

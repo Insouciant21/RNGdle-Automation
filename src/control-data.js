@@ -21,11 +21,7 @@ export function overviewPayload(config, status, state) {
     schedule: {
       timezone: config.timezone,
       time: config.schedule.time,
-      retryMinutes: config.schedule.retryMinutes,
-      rngdleRetryMinutes: config.schedule.retryMinutes,
-      emailRetryMinutes: config.schedule.emailRetryMinutes ?? 1,
       poemEnabled: config.poem?.enabled ?? false,
-      poemRetryMinutes: config.poem?.retryMinutes ?? 5,
     },
     rngdle: { email: config.rngdle.email, baseUrl: config.rngdle.baseUrl },
     mail: { from: config.smtp.from, to: [...config.smtp.to] },

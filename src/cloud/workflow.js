@@ -1,9 +1,13 @@
 import { getDailyRoll, AuthenticationRequiredError } from "../rngdle.js";
 import { composeDailyPoem } from "../poem-http.js";
 import { sendRollEmail, sendAuthenticationRequiredEmail } from "../mail.js";
-import { pruneState } from "../state.js";
 import { nextRetryAt } from "../schedule.js";
 import { errorSummary, log } from "../logger.js";
+
+function pruneState(state, keep = 45) {
+  const dates = Object.keys(state.days).sort().reverse();
+  for (const date of dates.slice(keep)) delete state.days[date];
+}
 
 export async function advanceWorkflow(config, state, date, dependencies = {}) {
   const { getRoll = getDailyRoll, composePoem = composeDailyPoem, sendRoll = sendRollEmail,

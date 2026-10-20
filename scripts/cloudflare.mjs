@@ -3,12 +3,12 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
+import { parseEnv } from "node:util";
 import { spawnSync } from "node:child_process";
-import { loadConfig } from "../src/config.js";
+import { workerConfig, configToEnv, splitWorkerBindings } from "../src/cloud/config.js";
 
 const [command, ...args] = process.argv.slice(2);
 const credentialsPath = process.env.MIGRATION_CREDENTIALS ?? "data/cloudflare-migration.json";
-const shellQuote = (value) => "'" + value.replaceAll("'", "'\\''") + "'";
 async function privateFile(file, value) {
   await fs.mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
   await fs.writeFile(file, JSON.stringify(value, null, 2) + "\n", { mode: 0o600 });
@@ -49,57 +49,42 @@ async function endpoint(action, method = "GET", payload) {
 }
 
 if (command === "init") {
-  const publicUrl = args[0] ?? process.env.CONTROL_PUBLIC_URL;
+  let local = {};
+  try { local = parseEnv(await fs.readFile(".dev.vars", "utf8")); }
+  catch (error) { if (error.code !== "ENOENT") throw error; }
+  const template = await read("wrangler.jsonc");
+  const variables = { ...template.vars, ...local, ...process.env };
+  const publicUrl = args[0] ?? variables.CONTROL_PUBLIC_URL;
   if (!publicUrl) throw new Error("Usage: pnpm cloudflare:init https://your-worker-name.your-subdomain.workers.dev");
-  process.env.CONTROL_PUBLIC_URL = publicUrl;
-  const config = await loadConfig();
+  const config = await workerConfig({ ...variables, CONTROL_PUBLIC_URL: publicUrl });
   delete config.storage;
-  config.control.publicUrl = publicUrl.replace(/\/$/, "");
-  config.control.cookieSecure = true;
-  config.control.initialPassword = null;
   let credentials;
   try { credentials = await read(credentialsPath); }
-  catch (error) { if (error.code !== "ENOENT") throw error; credentials = { token: crypto.randomBytes(32).toString("hex") }; }
+  catch (error) { if (error.code !== "ENOENT") throw error; credentials = { token: variables.MIGRATION_TOKEN || crypto.randomBytes(32).toString("hex") }; }
+  credentials.origin = config.control.publicUrl;
   await privateFile("data/cloudflare-config.json", config);
   await privateFile(credentialsPath, credentials);
-  await privateFile("data/cloudflare-secrets.json", { CONFIG_JSON: JSON.stringify(config), MIGRATION_TOKEN: credentials.token });
+  await privateFile("data/cloudflare-secrets.json", { ...configToEnv(config), MIGRATION_TOKEN: credentials.token });
   console.log(JSON.stringify({ config: "data/cloudflare-config.json", secrets: "data/cloudflare-secrets.json", controlUrl: config.control.publicUrl }, null, 2));
-} else if (command === "export") {
-  const [destination = "data/legacy-snapshot.json", host, directory] = args;
-  if (!host || !directory) throw new Error("Usage: pnpm cloudflare export <file> <user@host> <remote-project-directory>");
-  const controlPublicUrl = process.env.CONTROL_PUBLIC_URL;
-  if (!controlPublicUrl) throw new Error("Set CONTROL_PUBLIC_URL to the new Control URL before export");
-  const code = `
-    import fs from 'node:fs/promises';
-    import {loadConfig} from './src/config.js';
-    import {loadRuntimeSettings} from './src/settings.js';
-    const config = await loadConfig();
-    await loadRuntimeSettings(config);
-    const read = async (name) => {try {return JSON.parse(await fs.readFile(config.storage.directory+'/'+name+'.json','utf8'));} catch(error) {if(error.code==='ENOENT')return null;throw error;}};
-    const data={version:1,exportedAt:new Date().toISOString(),config,state:await read('state'),cookies:await read('cookies'),settings:await read('settings'),auth:await read('control-auth')};
-    delete config.storage;
-    config.control.initialPassword=null;
-    config.control.publicUrl=process.env.CONTROL_PUBLIC_URL;
-    config.control.cookieSecure=true;
-    if(data.auth){data.auth.sessions=[];data.auth.failures={};}
-    process.stdout.write(JSON.stringify(data));
-  `;
-  const remote = `cd ${shellQuote(directory)} && docker compose run --rm --no-deps -T rngdle node --input-type=module -e ${shellQuote(code)}`;
-  const data = JSON.parse(run("ssh", ["-F", "/dev/null", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, remote], { maxBuffer: 4 * 1024 * 1024 }));
-  await privateFile(destination, data);
-  console.log(JSON.stringify({ file: destination, days: Object.keys(data.state.days).length, exportedAt: data.exportedAt }));
 } else if (command === "secrets") {
-  const snapshot = await read(args[0] ?? "data/legacy-snapshot.json");
+  const source = await read(args.find((arg) => !arg.startsWith("--")) ?? "data/cloudflare-config.json");
+  const config = source.config ?? source;
   let credentials;
   try { credentials = await read(credentialsPath); }
   catch (error) { if (error.code !== "ENOENT") throw error; credentials = { token: crypto.randomBytes(32).toString("hex") }; }
+  credentials.origin ??= config.control.publicUrl;
   await privateFile(credentialsPath, credentials);
-  const secrets = { CONFIG_JSON: JSON.stringify(snapshot.config), MIGRATION_TOKEN: credentials.token };
+  const bindings = { ...configToEnv(config), MIGRATION_TOKEN: credentials.token };
+  await privateFile("data/cloudflare-secrets.json", bindings);
   if (args.includes("--local")) {
-    await fs.writeFile(".dev.vars", Object.entries(secrets).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join("\n") + "\n", { mode: 0o600 });
+    const local = { ...bindings, CONTROL_PUBLIC_URL: config.control.publicUrl };
+    await fs.writeFile(".dev.vars", Object.entries(local).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join("\n") + "\n", { mode: 0o600 });
+    await fs.chmod(".dev.vars", 0o600);
     console.log("Local Worker secrets saved to .dev.vars");
   } else {
+    const { secrets } = splitWorkerBindings(bindings);
     console.log(run("pnpm", ["exec", "wrangler", "secret", "bulk", ...(args.includes("--staging") ? ["--env", "staging"] : [])], { input: JSON.stringify(secrets) }));
+    console.log("Non-secret overrides saved to data/cloudflare-secrets.json for production builds");
   }
 } else if (command === "origin") {
   const credentials = await read(credentialsPath);
@@ -107,7 +92,8 @@ if (command === "init") {
   await privateFile(credentialsPath, credentials);
   console.log(`Migration origin: ${credentials.origin}`);
 } else if (command === "import") {
-  console.log(JSON.stringify(await endpoint("import", "POST", await read(args[0] ?? "data/legacy-snapshot.json"))));
+  if (!args[0]) throw new Error("Usage: pnpm cloudflare import <backup.json>");
+  console.log(JSON.stringify(await endpoint("import", "POST", await read(args[0]))));
 } else if (["status", "pause", "resume"].includes(command)) {
   console.log(JSON.stringify(await endpoint(command, command === "status" ? "GET" : "POST"), null, 2));
 } else if (command === "verify") {
@@ -141,6 +127,6 @@ if (command === "init") {
     subdomain: subdomain.subdomain, subscriptionAccess, dnsAccess, existingRoutes: routes,
     plans: subscriptions.map((entry) => ({ name: entry.rate_plan?.public_name ?? entry.rate_plan?.id, status: entry.state })) }, null, 2));
 } else {
-  console.log("Commands: init <url>, export <file> <user@host> <remote-project-directory>, secrets [file] [--local|--staging], origin <url>, import [file], status, pause, resume, verify <smtp|rngdle|poem|email>, backup [file], preflight");
+  console.log("Commands: init <url>, secrets [config-or-backup.json] [--local|--staging], origin <url>, import <backup.json>, status, pause, resume, verify <smtp|rngdle|poem|email>, backup [file], preflight");
   process.exitCode = command ? 1 : 0;
 }
