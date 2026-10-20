@@ -57,7 +57,7 @@ pnpm cloudflare backup backups/workers.json
 
 ## 配置与安全
 
-项目仅支持 Cloudflare Workers。配置示例 `.dev.vars.example` 只列必填项与常用功能开关；调度、重试、超时、回赞和 LLM 参数已有默认值，可通过 `wrangler.jsonc` 或 Workers Builds 变量覆盖。凭证和个人邮箱使用 Secret，构建脚本会过滤这些值。`MIGRATION_TOKEN` 是管理工具密钥，不是 Control 密码；SMTP、LLM 和管理凭证不会发送到前端。
+项目仅支持 Cloudflare Workers。配置示例 `.dev.vars.example` 只列必填项与常用功能开关；调度、重试、回赞和 LLM 参数已有默认值，可通过 `wrangler.jsonc` 或 Workers Builds 变量覆盖。HTTP/SMTP 超时固定为 45 秒，LLM 请求超时固定为 60 秒。凭证和个人邮箱使用 Secret，构建脚本会过滤这些值。`MIGRATION_TOKEN` 是管理工具密钥，不是 Control 密码；SMTP、LLM 和管理凭证不会发送到前端。
 
 | 变量 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- |
@@ -65,7 +65,6 @@ pnpm cloudflare backup backups/workers.json
 | `SCHEDULE_TIME` | var | `08:02` | 每日执行时间（HH:mm） |
 | `RETRY_MINUTES` / `EMAIL_RETRY_MINUTES` | var | `30` / `1` | RNGdle / 邮件重试间隔 |
 | `RNGDLE_EMAIL` | Secret | 必填 | RNGdle 账号邮箱 |
-| `HTTP_TIMEOUT_MS` | var | `45000` | 出站请求超时 |
 | `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_REQUIRE_TLS` | var | 见 wrangler.jsonc | SMTP 传输 |
 | `SMTP_USER`、`MAIL_TO` | Secret | 必填 | 发件账号与收件人邮箱 |
 | `MAIL_FROM` | Secret | `SMTP_USER` | 仅发件地址不同时填写 |
@@ -73,7 +72,7 @@ pnpm cloudflare backup backups/workers.json
 | `SMTP_AUTH_MODE`、`SMTP_OAUTH_*` | var / Secret | `password` | 认证方式（OAuth 凭证为 Secret） |
 | `MAIL_FROM_NAME`、`MAIL_SUBJECT_PREFIX` | var | 同本地默认 | 发件外观 |
 | `POEM_ENABLED`、`POEM_RETRY_MINUTES` | var | `false` / `5` | 诗歌开关 |
-| `LLM_ENDPOINT`、`LLM_MODEL`、`LLM_TIMEOUT_MS`、`LLM_MAX_TOKENS`、`LLM_MAX_ATTEMPTS`、`LLM_THINKING` | var | 见 wrangler.jsonc | 作诗模型参数 |
+| `LLM_ENDPOINT`、`LLM_MODEL`、`LLM_MAX_TOKENS`、`LLM_MAX_ATTEMPTS`、`LLM_THINKING` | var | 见 wrangler.jsonc | 作诗模型参数 |
 | `LLM_API_KEY` | Secret | 开启诗歌时必填 | 作诗模型密钥 |
 | `RETURN_LIKES_*` 四项 | var | 关 / `60`/`10`/`7` | 回赞参数 |
 | `CONTROL_PUBLIC_URL` | var | 必填 | 控制台公网地址 |

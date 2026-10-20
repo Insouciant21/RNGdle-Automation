@@ -16,7 +16,6 @@
     "SCHEDULE_TIME": "08:02",
     "RETRY_MINUTES": "30",
     "EMAIL_RETRY_MINUTES": "1",
-    "HTTP_TIMEOUT_MS": "45000",
     "CONTROL_SESSION_DAYS": "7",
     "SMTP_PORT": "587",
     "SMTP_SECURE": "false",
@@ -32,7 +31,6 @@
     "RETURN_LIKES_LOOKBACK_DAYS": "7",
     "LLM_ENDPOINT": "https://api.deepseek.com",
     "LLM_MODEL": "deepseek-flash",
-    "LLM_TIMEOUT_MS": "60000",
     "LLM_MAX_TOKENS": "2048",
     "LLM_MAX_ATTEMPTS": "3",
     "LLM_THINKING": "disabled"

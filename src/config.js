@@ -76,7 +76,7 @@ export function normalizeConfig(raw) {
       email: requiredString(raw.rngdle?.email, "rngdle.email"),
     },
     http: {
-      timeoutMs: positiveInteger(raw.http?.timeoutMs ?? 45_000, "http.timeoutMs"),
+      timeoutMs: 45_000,
     },
     control: {
       publicUrl: controlPublicUrl,
@@ -117,7 +117,7 @@ export function normalizeConfig(raw) {
       endpoint: requiredString(raw.llm?.endpoint ?? "https://api.deepseek.com", "llm.endpoint").replace(/\/$/, ""),
       apiKey: optionalString(raw.llm?.apiKey),
       model: requiredString(raw.llm?.model ?? "deepseek-flash", "llm.model"),
-      timeoutMs: positiveInteger(raw.llm?.timeoutMs ?? 60_000, "llm.timeoutMs"),
+      timeoutMs: 60_000,
       maxTokens: positiveInteger(raw.llm?.maxTokens ?? 2_048, "llm.maxTokens"),
       maxAttempts: positiveInteger(raw.llm?.maxAttempts ?? 3, "llm.maxAttempts"),
       thinking: requiredString(raw.llm?.thinking ?? "disabled", "llm.thinking"),

@@ -17,11 +17,14 @@ test("minimal Worker bindings use defaults and Durable Object storage", async ()
   const config = await workerConfig(required, storage);
   assert.equal(config.timezone, "Asia/Shanghai");
   assert.equal(config.rngdle.baseUrl, "https://www.rngdle.com");
-  assert.equal("RNGDLE_BASE_URL" in configToEnv(config), false);
+  for (const name of ["RNGDLE_BASE_URL", "HTTP_TIMEOUT_MS", "LLM_TIMEOUT_MS"]) {
+    assert.equal(name in configToEnv(config), false);
+  }
   assert.deepEqual(config.schedule, { time: "08:02", retryMinutes: 30, emailRetryMinutes: 1 });
   assert.deepEqual(config.control, { publicUrl: required.CONTROL_PUBLIC_URL, sessionDays: 7 });
   assert.deepEqual(config.storage, { adapter: storage });
   assert.equal(config.http.timeoutMs, 45_000);
+  assert.equal(config.llm.timeoutMs, 60_000);
   assert.equal(config.smtp.port, 587);
   assert.equal(config.smtp.secure, false);
   assert.equal(config.smtp.requireTls, true);
@@ -46,21 +49,24 @@ test("missing required Worker bindings fail before a workflow can run", async ()
 
 test("deployment variables validate types, schedules, timezones and URLs", async () => {
   for (const extra of [
-    { SCHEDULE_TIME: "25:00" }, { TZ: "invalid" }, { HTTP_TIMEOUT_MS: "0" },
+    { SCHEDULE_TIME: "25:00" }, { TZ: "invalid" },
     { RETURN_LIKES_POLL_MINUTES: "0" }, { POEM_ENABLED: "yes" }, { SMTP_PORT: "invalid" },
     { CONTROL_PUBLIC_URL: "invalid" },
   ]) await assert.rejects(workerConfig({ ...required, ...extra }));
 });
 
-test("legacy aliases and Node server settings no longer affect Worker configuration", async () => {
+test("retired bindings no longer affect Worker configuration", async () => {
+  const retired = {
+    RNGDLE_BASE_URL: "https://other.example.com", HTTP_TIMEOUT_MS: "1", LLM_TIMEOUT_MS: "1",
+  };
   const config = await workerConfig({
-    ...required, BROWSER_TIMEOUT_MS: "90000", MAIL_RETRY_MINUTES: "10", llm_model: "old-model",
+    ...required, ...retired, BROWSER_TIMEOUT_MS: "90000", MAIL_RETRY_MINUTES: "10", llm_model: "old-model",
     POLL_SECONDS: "1", CONTROL_PORT: "9000", CONTROL_PASSWORD: "unused-password", CONTROL_COOKIE_SECURE: "false",
-    RNGDLE_BASE_URL: "https://other.example.com",
   });
   assert.equal(config.rngdle.baseUrl, "https://www.rngdle.com");
-  assert.deepEqual(splitWorkerBindings({ RNGDLE_BASE_URL: "https://other.example.com" }), { vars: {}, secrets: {} });
+  assert.deepEqual(splitWorkerBindings(retired), { vars: {}, secrets: {} });
   assert.equal(config.http.timeoutMs, 45_000);
+  assert.equal(config.llm.timeoutMs, 60_000);
   assert.equal(config.schedule.emailRetryMinutes, 1);
   assert.equal(config.llm.model, "deepseek-flash");
   assert.equal(config.schedule.pollSeconds, undefined);
