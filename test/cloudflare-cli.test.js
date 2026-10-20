@@ -18,7 +18,7 @@ test("Worker initialization uses .dev.vars, keeps credentials private, and ignor
   const run = (...args) => spawnSync(process.execPath, [script, ...args], { cwd: directory, env, encoding: "utf8" });
   const result = run("init", "https://control.example.com");
   assert.equal(result.status, 0, result.stderr);
-  assert.doesNotMatch(result.stdout, /replace-with-smtp-password|unused-legacy-password/);
+  assert.doesNotMatch(result.stdout, /replace-with-smtp-password|unused-legacy-password|replace-with-control-password/);
   const read = async (file) => JSON.parse(await fs.readFile(path.join(directory, file), "utf8"));
   const config = await read("data/cloudflare-config.json");
   assert.equal(config.smtp.password, "replace-with-smtp-password");
@@ -26,6 +26,8 @@ test("Worker initialization uses .dev.vars, keeps credentials private, and ignor
   assert.equal(config.likes.pollMinutes, 60);
   assert.equal(config.storage, undefined);
   assert.deepEqual(Object.keys(config.control).sort(), ["publicUrl", "sessionDays"]);
+  assert.doesNotMatch(JSON.stringify(config), /replace-with-control-password/);
+  assert.equal((await read("data/cloudflare-secrets.json")).CONTROL_PASSWORD, "replace-with-control-password");
   const credentials = await read("credentials.json");
   assert.equal(credentials.origin, "https://control.example.com");
   assert.equal(credentials.token, "replace-with-a-random-32-byte-hex-string");
@@ -37,5 +39,5 @@ test("Worker initialization uses .dev.vars, keeps credentials private, and ignor
   assert.equal(variables.CONTROL_PUBLIC_URL, "https://control.example.com");
   assert.equal(variables.MIGRATION_TOKEN, credentials.token);
   assert.equal(variables.CONFIG_JSON, undefined);
-  assert.equal(variables.CONTROL_PASSWORD, undefined);
+  assert.equal(variables.CONTROL_PASSWORD, "replace-with-control-password");
 });

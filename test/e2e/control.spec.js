@@ -52,6 +52,11 @@ test("Workers rejects missing CSRF and removed endpoints, keeping deployment sec
   const overviewText = await overview.text();
   expect(overviewText).not.toContain("smtp-private");
   expect(overviewText).not.toContain("llm-private");
+  expect(overviewText).not.toContain("control-test-password");
+  const setup = await request.post("/api/auth/setup", { headers: { "X-CSRF-Token": csrfToken }, data: {} });
+  expect(setup.status()).toBe(404);
+  const setupPage = await request.get("/setup");
+  expect(setupPage.status()).toBe(404);
   expect(overviewText).toContain("\"time\":\"08:02\"");
   const duplicate = await request.post("/__migration/import", { headers: { Authorization: "Bearer e2e-migration-token" }, data: await bundle() });
   expect(duplicate.status()).toBe(409);

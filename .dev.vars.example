@@ -5,6 +5,7 @@ SMTP_HOST=smtp.example.com
 SMTP_USER=sender@example.com
 SMTP_PASSWORD=replace-with-smtp-password
 MAIL_TO=receiver@example.com
+CONTROL_PASSWORD=replace-with-control-password
 MIGRATION_TOKEN=replace-with-a-random-32-byte-hex-string
 CONTROL_PUBLIC_URL=http://localhost:4321
 

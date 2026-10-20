@@ -58,8 +58,8 @@
       "CONTROL_PUBLIC_URL": {
         "description": "Public HTTPS URL for the Control page. For a custom deployment, set this as a Workers Builds variable."
       },
-      "ALLOW_SETUP": {
-        "description": "Set to `true` for a fresh deployment, then `false` after creating the Control password."
+      "CONTROL_PASSWORD": {
+        "description": "Control sign-in password (8–512 characters). Store as a Worker secret. Updating it invalidates existing sessions."
       },
       "WORKER_NAME": {
         "description": "Optional Workers Builds variable used to override the Worker name without editing the repository."

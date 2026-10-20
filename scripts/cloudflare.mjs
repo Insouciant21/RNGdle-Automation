@@ -6,6 +6,7 @@ import crypto from "node:crypto";
 import { parseEnv } from "node:util";
 import { spawnSync } from "node:child_process";
 import { workerConfig, configToEnv, splitWorkerBindings } from "../src/cloud/config.js";
+import { isControlPasswordConfigured } from "../src/control-auth.js";
 
 const [command, ...args] = process.argv.slice(2);
 const credentialsPath = process.env.MIGRATION_CREDENTIALS ?? "data/cloudflare-migration.json";
@@ -15,6 +16,12 @@ async function privateFile(file, value) {
   await fs.chmod(file, 0o600);
 }
 const read = async (file) => JSON.parse(await fs.readFile(file, "utf8"));
+async function localVariables() {
+  let local = {};
+  try { local = parseEnv(await fs.readFile(".dev.vars", "utf8")); }
+  catch (error) { if (error.code !== "ENOENT") throw error; }
+  return { ...local, ...process.env };
+}
 function run(program, values, options = {}) {
   const result = spawnSync(program, values, { encoding: "utf8", ...options });
   if (result.status !== 0) throw new Error(result.stderr || result.error?.message || `${program} failed`);
@@ -49,11 +56,9 @@ async function endpoint(action, method = "GET", payload) {
 }
 
 if (command === "init") {
-  let local = {};
-  try { local = parseEnv(await fs.readFile(".dev.vars", "utf8")); }
-  catch (error) { if (error.code !== "ENOENT") throw error; }
   const template = await read("wrangler.jsonc");
-  const variables = { ...template.vars, ...local, ...process.env };
+  const variables = { ...template.vars, ...await localVariables() };
+  if (!isControlPasswordConfigured(variables.CONTROL_PASSWORD)) throw new Error("Set CONTROL_PASSWORD in .dev.vars (8–512 characters)");
   const publicUrl = args[0] ?? variables.CONTROL_PUBLIC_URL;
   if (!publicUrl) throw new Error("Usage: pnpm cloudflare:init https://your-worker-name.your-subdomain.workers.dev");
   const config = await workerConfig({ ...variables, CONTROL_PUBLIC_URL: publicUrl });
@@ -64,17 +69,25 @@ if (command === "init") {
   credentials.origin = config.control.publicUrl;
   await privateFile("data/cloudflare-config.json", config);
   await privateFile(credentialsPath, credentials);
-  await privateFile("data/cloudflare-secrets.json", { ...configToEnv(config), MIGRATION_TOKEN: credentials.token });
+  await privateFile("data/cloudflare-secrets.json", { ...configToEnv(config), CONTROL_PASSWORD: variables.CONTROL_PASSWORD, MIGRATION_TOKEN: credentials.token });
   console.log(JSON.stringify({ config: "data/cloudflare-config.json", secrets: "data/cloudflare-secrets.json", controlUrl: config.control.publicUrl }, null, 2));
 } else if (command === "secrets") {
   const source = await read(args.find((arg) => !arg.startsWith("--")) ?? "data/cloudflare-config.json");
   const config = source.config ?? source;
+  let existing = {};
+  try { existing = await read("data/cloudflare-secrets.json"); }
+  catch (error) { if (error.code !== "ENOENT") throw error; }
+  const password = (await localVariables()).CONTROL_PASSWORD ?? existing.CONTROL_PASSWORD;
+  if ((password !== undefined || args.includes("--local")) && !isControlPasswordConfigured(password)) {
+    throw new Error("Set CONTROL_PASSWORD in .dev.vars (8–512 characters)");
+  }
   let credentials;
   try { credentials = await read(credentialsPath); }
   catch (error) { if (error.code !== "ENOENT") throw error; credentials = { token: crypto.randomBytes(32).toString("hex") }; }
   credentials.origin ??= config.control.publicUrl;
   await privateFile(credentialsPath, credentials);
   const bindings = { ...configToEnv(config), MIGRATION_TOKEN: credentials.token };
+  if (password !== undefined) bindings.CONTROL_PASSWORD = password;
   await privateFile("data/cloudflare-secrets.json", bindings);
   if (args.includes("--local")) {
     const local = { ...bindings, CONTROL_PUBLIC_URL: config.control.publicUrl };

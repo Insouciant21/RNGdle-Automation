@@ -1,48 +1,18 @@
 import crypto from "node:crypto";
 
-const AUTH_VERSION = 1;
+const AUTH_VERSION = 2;
 const PASSWORD_MIN_LENGTH = 8;
-const KEY_LENGTH = 64;
-const SCRYPT_OPTIONS = { N: 16_384, r: 8, p: 1, maxmem: 32 * 1024 * 1024 };
 
 function randomToken(bytes = 32) {
   return crypto.randomBytes(bytes).toString("base64url");
 }
 
-function tokenDigest(token) {
-  return crypto.createHash("sha256").update(token).digest("hex");
+function tokenDigest(token, password) {
+  return crypto.createHmac("sha256", password).update(token).digest("hex");
 }
 
-function passwordInput(password) {
-  if (typeof password !== "string" || password.length < PASSWORD_MIN_LENGTH) {
-    throw new Error(`Control password must be at least ${PASSWORD_MIN_LENGTH} characters`);
-  }
-  if (password.length > 512) throw new Error("Control password is too long");
-  return password;
-}
-
-function derivePassword(password, salt) {
-  return new Promise((resolve, reject) => {
-    crypto.scrypt(password, salt, KEY_LENGTH, SCRYPT_OPTIONS, (error, key) => {
-      if (error) reject(error);
-      else resolve(key.toString("hex"));
-    });
-  });
-}
-
-async function hashPassword(password) {
-  const salt = randomToken(16);
-  return { algorithm: "scrypt", salt, key: await derivePassword(password, salt) };
-}
-
-async function verifyPassword(password, stored) {
-  if (!stored || stored.algorithm !== "scrypt" || typeof stored.salt !== "string" || typeof stored.key !== "string") {
-    return false;
-  }
-  const derived = await derivePassword(password, stored.salt);
-  const expected = Buffer.from(stored.key, "hex");
-  const actual = Buffer.from(derived, "hex");
-  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+export function isControlPasswordConfigured(password) {
+  return typeof password === "string" && password.trim() !== "" && password.length >= PASSWORD_MIN_LENGTH && password.length <= 512;
 }
 
 function cleanSessions(document, now = Date.now()) {
@@ -51,19 +21,20 @@ function cleanSessions(document, now = Date.now()) {
   );
 }
 
-export async function createControlAuth({ sessionDays = 7, storage }) {
-  let document = await storage.get("auth");
-  if (!document) {
-    document = {
-      version: AUTH_VERSION,
-      password: null,
-      sessions: [],
-    };
-    await storage.put("auth", document);
+export async function createControlAuth({ password: secret, sessionDays = 7, storage }) {
+  if (!isControlPasswordConfigured(secret)) {
+    throw new Error("Set CONTROL_PASSWORD as a Worker secret (8–512 characters)");
   }
-  if (document.version !== AUTH_VERSION || (document.password !== null && !document.password)) {
-    throw new Error("Unsupported Control authentication state format");
-  }
+  const expectedPassword = crypto.createHash("sha256").update(secret).digest();
+  const document = await storage.transaction(async (transaction) => {
+    const current = await transaction.get("auth");
+    if (current?.version === AUTH_VERSION) return current;
+    if (current && current.version !== 1) throw new Error("Unsupported Control authentication state format");
+    // Retire the migrated password hash and sessions from the old credential.
+    const next = { version: AUTH_VERSION, sessions: [], failures: current?.failures ?? {} };
+    await transaction.put("auth", next);
+    return next;
+  });
   cleanSessions(document);
   const failedAttempts = new Map(Object.entries(document.failures ?? {}));
   const maxAgeSeconds = sessionDays * 24 * 60 * 60;
@@ -102,9 +73,10 @@ export async function createControlAuth({ sessionDays = 7, storage }) {
   }
 
   async function login(password, address) {
-    if (!document.password) throw new Error("Control password has not been configured");
     if (isRateLimited(address)) throw new Error("Too many failed attempts. Try again in a minute.");
-    const valid = typeof password === "string" && password.length <= 512 && await verifyPassword(password, document.password);
+    const valid = typeof password === "string" && password.length <= 512 && crypto.timingSafeEqual(
+      crypto.createHash("sha256").update(password).digest(), expectedPassword,
+    );
     if (!valid) {
       recordFailure(address);
       await persist();
@@ -119,23 +91,15 @@ export async function createControlAuth({ sessionDays = 7, storage }) {
     const csrfToken = randomToken(24);
     const createdAt = new Date().toISOString();
     const expiresAt = new Date(Date.now() + maxAgeSeconds * 1_000).toISOString();
-    document.sessions.push({ tokenHash: tokenDigest(token), csrfToken, createdAt, expiresAt });
+    document.sessions.push({ tokenHash: tokenDigest(token, secret), csrfToken, createdAt, expiresAt });
     await persist();
     return { token, csrfToken, createdAt, expiresAt, maxAgeSeconds };
-  }
-
-  async function setupPassword(password, confirmation) {
-    if (document.password) throw new Error("Control password is already configured");
-    const nextPassword = passwordInput(password);
-    if (nextPassword !== confirmation) throw new Error("Control passwords do not match");
-    document.password = await hashPassword(nextPassword);
-    return issueSession();
   }
 
   function findSession(token) {
     if (!token) return null;
     cleanSessions(document);
-    const digest = tokenDigest(token);
+    const digest = tokenDigest(token, secret);
     return document.sessions.find((session) => {
       const expected = Buffer.from(session.tokenHash, "hex");
       const actual = Buffer.from(digest, "hex");
@@ -151,17 +115,13 @@ export async function createControlAuth({ sessionDays = 7, storage }) {
 
   async function logout(token) {
     if (!token) return;
-    const digest = tokenDigest(token);
+    const digest = tokenDigest(token, secret);
     document.sessions = document.sessions.filter((current) => current.tokenHash !== digest);
     await persist();
   }
 
   return {
-    isConfigured() {
-      return Boolean(document.password);
-    },
     login,
-    setupPassword,
     session,
     logout,
   };

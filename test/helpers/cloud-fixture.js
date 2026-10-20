@@ -5,6 +5,7 @@ export class MemoryStorage {
   alarm = null;
   async get(key) { return structuredClone(this.data.get(key)); }
   async put(key, value) { this.data.set(key, structuredClone(value)); }
+  async delete(key) { this.data.delete(key); }
   async setAlarm(at) { this.alarm = Number(at); }
   async getAlarm() { return this.alarm; }
   async deleteAlarm() { this.alarm = null; }

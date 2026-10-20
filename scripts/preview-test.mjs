@@ -10,7 +10,7 @@ const config = JSON.parse(await fs.readFile("dist/server/wrangler.json", "utf8")
 config.main = path.resolve("dist/server", config.main);
 config.assets.directory = path.resolve("dist/server", config.assets.directory);
 config.name = "rngdle-runtime-test";
-config.vars = { ...config.vars, ...configToEnv(fixtureConfig), MIGRATION_TOKEN: "e2e-migration-token", CONTROL_PUBLIC_URL: "http://localhost:4322" };
+config.vars = { ...config.vars, ...configToEnv(fixtureConfig), CONTROL_PASSWORD: "control-test-password", MIGRATION_TOKEN: "e2e-migration-token", CONTROL_PUBLIC_URL: "http://localhost:4322" };
 delete config.configPath;
 delete config.userConfigPath;
 await fs.writeFile(path.join(directory, "wrangler.json"), JSON.stringify(config));

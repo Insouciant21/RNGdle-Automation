@@ -67,11 +67,11 @@ function rawFromEnv(env) {
 export function splitWorkerBindings(env) {
   const vars = {};
   const secrets = {};
-  const fields = [...ENV_FIELDS, ["MIGRATION_TOKEN", null, true]];
+  const fields = [...ENV_FIELDS, ["MIGRATION_TOKEN", null, true], ["CONTROL_PASSWORD", null, true]];
   for (const [name, , sensitive] of fields) {
     const value = env[name];
     if (typeof value === "string" && value.trim() !== "") {
-      (sensitive ? secrets : vars)[name] = value.trim();
+      (sensitive ? secrets : vars)[name] = name === "CONTROL_PASSWORD" ? value : value.trim();
     }
   }
   return { vars, secrets };

@@ -8,9 +8,9 @@ Astro 控制台与 Cloudflare Workers 每日自动化服务。默认每天按配
 
 ## 功能
 
-- Astro SSR 控制台：Overview、Logs、Authentication、登录与首次密码设置
+- Astro SSR 控制台：Overview、Logs、Authentication，通过 Secret 配置密码登录
 - 同源 `/api/*` 与邮件预览接口，实际邮件与预览使用同一模板
-- SQLite Durable Object 持久化 Cookie、45 天每日状态、Control 密码哈希、Session、登录限流与最近日志
+- SQLite Durable Object 持久化 Cookie、45 天每日状态、Session、登录限流与最近日志
 - Durable Object Alarm 调度 `roll → poem → email`，每个阶段独立持久化和重试
 - 写操作与 Alarm 串行执行，对象重启后从已完成阶段恢复
 - 登录失效时暂停任务并提示重新认证，提交 magic link 后恢复
@@ -53,7 +53,7 @@ pnpm cloudflare resume
 pnpm cloudflare backup backups/workers.json
 ```
 
-备份包含配置、Cookie、每日状态、回赞去重记录和密码哈希。恢复时先向空 Worker 导入，再验证并启用调度；旧版备份仍可导入。
+备份包含配置、Cookie、每日状态和回赞去重记录。恢复时先向空 Worker 导入，再验证并启用调度；登录密码沿用目标 Worker 的 `CONTROL_PASSWORD` Secret。旧版备份仍可导入，其中的 Control 密码哈希不会恢复。
 
 ## 配置与安全
 
@@ -77,7 +77,8 @@ pnpm cloudflare backup backups/workers.json
 | `RETURN_LIKES_*` 四项 | var | 关 / `60`/`10`/`7` | 回赞参数 |
 | `CONTROL_PUBLIC_URL` | var | 必填 | 控制台公网地址 |
 | `CONTROL_SESSION_DAYS` | var | `7` | 登录会话天数 |
-| `ALLOW_SETUP`、`MIGRATION_TOKEN` | var / Secret | — | 首次设置门禁与管理接口 |
+| `CONTROL_PASSWORD` | Secret | 必填 | 控制台密码，8–512 个字符；修改后旧会话失效 |
+| `MIGRATION_TOKEN` | Secret | 必填 | 管理与备份接口密钥 |
 
 `SMTP_AUTH_MODE=oauth2` 时改用 `SMTP_OAUTH_*` 四项，无需 `SMTP_PASSWORD`。
 
@@ -85,6 +86,6 @@ pnpm cloudflare backup backups/workers.json
 
 `pnpm deploy:workers` 按 Workers Builds 变量构建并部署。使用本地专属配置时，`pnpm deploy:production` 会合并被忽略的 `wrangler.production.jsonc` 与 `data/cloudflare-secrets.json` 中的非敏感覆盖值，再按同一份配置构建并部署；可加 `--dry-run` 仅验证构建与打包。修改变量后需重新部署生效。
 
-生产 `CONTROL_PUBLIC_URL` 固定为 Wrangler 配置中的 HTTPS 地址，备份中的 URL 不会覆盖它。Control 密码通过首次设置页面创建，Cookie 始终启用 Secure；运行配置从 Worker 绑定读取，本地通过 `.dev.vars` 提供。
+生产 `CONTROL_PUBLIC_URL` 固定为 Wrangler 配置中的 HTTPS 地址，备份中的 URL 不会覆盖它。Control 密码由 `CONTROL_PASSWORD` Secret 管理，可在 Cloudflare 控制台修改，或运行 `pnpm exec wrangler secret put CONTROL_PASSWORD`。Durable Object 只保存会话和登录限流记录，修改密码后旧会话失效。Cookie 始终启用 Secure；运行配置从 Worker 绑定读取，本地通过 `.dev.vars` 提供。
 
 技术依据：[Astro Cloudflare 适配器](https://docs.astro.build/en/guides/integrations-guide/cloudflare/)、[Durable Object Alarms](https://developers.cloudflare.com/durable-objects/api/alarms/)、[Workers TCP sockets](https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/)。

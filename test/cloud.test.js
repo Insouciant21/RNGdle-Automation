@@ -12,6 +12,7 @@ import { MemoryStorage, fixtureConfig, bundle } from "./helpers/cloud-fixture.js
 
 const roll = { number: 123456, earnedEp: 100, totalEp: 200, badges: [], poem: null };
 const empty = () => ({ version: 1, days: {} });
+const fixtureBindings = (config = fixtureConfig) => ({ ...configToEnv(config), CONTROL_PASSWORD: "control-test-password" });
 const request = (path, body, headers = {}) => new Request(`https://control.example.com${path}`, {
   method: body === undefined ? "GET" : "POST", headers: { "Content-Type": "application/json", ...headers }, body: body === undefined ? undefined : JSON.stringify(body),
 });
@@ -105,25 +106,28 @@ test("alarms schedule across DST using real timezone instants", () => {
   assert.equal(nextWake(config, state, new Date("2026-03-07T14:00:00Z")), Date.parse("2026-03-08T12:02:00Z"));
 });
 
-test("import requires a bearer token and empty storage, preserving hash and clearing sessions", async () => {
+test("import requires a bearer token and empty storage, ignoring the old password and sessions", async () => {
   const { storage } = setup();
-  const service = new AutomationService(storage, { ...configToEnv(fixtureConfig), MIGRATION_TOKEN: "migration-private", CONTROL_PUBLIC_URL: "https://control.example.com" });
+  const service = new AutomationService(storage, { ...fixtureBindings(), MIGRATION_TOKEN: "migration-private", CONTROL_PUBLIC_URL: "https://control.example.com" });
   const data = await bundle();
   assert.equal((await service.fetch(request("/__migration/import", data))).status, 404);
   const headers = { Authorization: "Bearer migration-private" };
   assert.equal((await service.fetch(request("/__migration/import", data, headers))).status, 200);
-  assert.deepEqual((await storage.get("auth")).sessions, []);
-  assert.deepEqual((await storage.get("auth")).password, data.auth.password);
+  assert.equal(await storage.get("auth"), undefined);
   assert.equal((await storage.get("meta")).paused, true);
   assert.equal((await service.fetch(request("/__migration/import", data, headers))).status, 409);
   const login = await service.fetch(request("/api/auth/login", { password: "control-test-password" }));
   assert.equal(login.status, 200);
   assert.match(login.headers.get("set-cookie"), /HttpOnly.*Secure/);
+  assert.equal("password" in await storage.get("auth"), false);
+  const backup = await (await service.fetch(request("/__migration/export", undefined, headers))).json();
+  assert.equal("auth" in backup, false);
+  assert.doesNotMatch(JSON.stringify(backup), /control-test-password/);
 });
 
 test("Control sessions, CSRF, and logs survive service recreation with config fixed to environment variables", async () => {
   const { storage } = setup();
-  const env = { ...configToEnv(fixtureConfig), MIGRATION_TOKEN: "migration-private", CONTROL_PUBLIC_URL: "https://control.example.com" };
+  const env = { ...fixtureBindings(), MIGRATION_TOKEN: "migration-private", CONTROL_PUBLIC_URL: "https://control.example.com" };
   let service = new AutomationService(storage, env);
   await service.fetch(request("/__migration/import", await bundle(), { Authorization: "Bearer migration-private" }));
   const login = await service.fetch(request("/api/auth/login", { password: "control-test-password" }));
@@ -147,7 +151,7 @@ test("Control sessions, CSRF, and logs survive service recreation with config fi
 });
 
 test("backups restore return-like history and daily limits without resetting the baseline", async () => {
-  const env = { ...configToEnv(fixtureConfig), MIGRATION_TOKEN: "migration-private", CONTROL_PUBLIC_URL: "https://control.example.com" };
+  const env = { ...fixtureBindings(), MIGRATION_TOKEN: "migration-private", CONTROL_PUBLIC_URL: "https://control.example.com" };
   const storage = new MemoryStorage();
   const service = new AutomationService(storage, env);
   const data = await bundle();
@@ -176,7 +180,7 @@ test("concurrent alarms serialize and never generate a second roll", async () =>
   const config = structuredClone(fixtureConfig); config.schedule.time = "00:00"; config.poem.enabled = false;
   await storage.put("meta", { paused: false, importedAt: new Date().toISOString() });
   let rolls = 0;
-  const service = new AutomationService(storage, { ...configToEnv(config), CONTROL_PUBLIC_URL: "https://control.example.com" }, {
+  const service = new AutomationService(storage, { ...fixtureBindings(config), CONTROL_PUBLIC_URL: "https://control.example.com" }, {
     getRoll: async () => { rolls++; await new Promise((resolve) => setTimeout(resolve, 15)); return { ...roll }; }, sendRoll: async () => ({ messageId: "concurrent" }),
   });
   await Promise.all([service.tick(), service.tick(), service.tick()]);
@@ -193,7 +197,7 @@ test("an alarm runs the return-like workflow without rerunning a completed daily
   await storage.put("state", { version: 1, days: { [today]: { status: "success" } } });
   await storage.put("meta", { paused: false, importedAt: new Date().toISOString() });
   let calls = 0;
-  const service = new AutomationService(storage, { ...configToEnv(config), CONTROL_PUBLIC_URL: "https://control.example.com" }, {
+  const service = new AutomationService(storage, { ...fixtureBindings(config), CONTROL_PUBLIC_URL: "https://control.example.com" }, {
     getRoll: () => assert.fail("must not reroll a completed day"),
     processReturnLikes: async (_config, social) => {
       calls++;
@@ -208,7 +212,7 @@ test("an alarm runs the return-like workflow without rerunning a completed daily
 
 test("failed login limits remain enforced after object restart", async () => {
   const { storage } = setup();
-  const env = { ...configToEnv(fixtureConfig), MIGRATION_TOKEN: "migration-private", CONTROL_PUBLIC_URL: "https://control.example.com" };
+  const env = { ...fixtureBindings(), MIGRATION_TOKEN: "migration-private", CONTROL_PUBLIC_URL: "https://control.example.com" };
   let service = new AutomationService(storage, env);
   await service.fetch(request("/__migration/import", await bundle(), { Authorization: "Bearer migration-private" }));
   for (let i = 0; i < 5; i++) assert.equal((await service.fetch(request("/api/auth/login", { password: "incorrect" }))).status, 401);
@@ -265,16 +269,13 @@ test("an expired daily session prevents a return-like check in the same alarm", 
   assert.equal(await storage.getAlarm(), null);
 });
 
-test("a fresh Worker can enable automation after first-run setup without importing a backup", async () => {
+test("a fresh Worker uses the password secret and can enable automation without importing a backup", async () => {
   const storage = new MemoryStorage();
-  const env = { ...configToEnv(fixtureConfig), CONTROL_PUBLIC_URL: "https://control.example.com", MIGRATION_TOKEN: "private-management-token", ALLOW_SETUP: "true" };
+  const env = { ...configToEnv(fixtureConfig), CONTROL_PUBLIC_URL: "https://control.example.com", MIGRATION_TOKEN: "private-management-token" };
   let service = new AutomationService(storage, env);
   const headers = { Authorization: "Bearer private-management-token" };
   assert.equal((await service.fetch(request("/__migration/resume", {}, headers))).status, 409);
-  assert.equal((await service.fetch(request("/api/auth/setup", {
-    password: "control-test-password", confirmation: "control-test-password",
-  }))).status, 201);
-  service = new AutomationService(storage, { ...env, ALLOW_SETUP: "false" });
+  service = new AutomationService(storage, { ...env, CONTROL_PASSWORD: "control-test-password" });
   assert.equal((await service.fetch(request("/api/auth/login", { password: "control-test-password" }))).status, 200);
   assert.equal((await service.fetch(request("/__migration/resume", {}, headers))).status, 200);
   assert.equal((await service.status()).state, "authenticated");
@@ -282,11 +283,14 @@ test("a fresh Worker can enable automation after first-run setup without importi
   assert.equal((await storage.get("meta")).importedAt, undefined);
 });
 
-test("a locked fresh Worker reports setup disabled instead of a migration requirement", async () => {
-  const service = new AutomationService(new MemoryStorage(), { ALLOW_SETUP: "false" });
+test("a Worker with an old stored password still requires the password secret", async () => {
+  const storage = new MemoryStorage();
+  await storage.put("auth", (await bundle()).auth);
+  const service = new AutomationService(storage, {});
   const session = await (await service.fetch(request("/api/auth/session"))).json();
-  assert.deepEqual(session, { authenticated: false, configured: false, setupDisabled: true });
-  assert.equal((await service.status()).label, "Waiting for Control setup");
+  assert.deepEqual(session, { authenticated: false, configured: false });
+  assert.equal((await service.status()).label, "Waiting for CONTROL_PASSWORD secret");
+  assert.equal((await service.fetch(request("/api/auth/login", { password: "control-test-password" }))).status, 503);
 });
 
 test("the Worker keeps only the latest 45 daily records", async () => {

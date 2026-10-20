@@ -8,7 +8,7 @@ async function setup() {
   const storage = new MemoryStorage();
   const sent = [];
   const service = new AutomationService(storage, {
-    ...configToEnv(fixtureConfig), CONTROL_PUBLIC_URL: "https://control.example.com", MIGRATION_TOKEN: "private-management-token",
+    ...configToEnv(fixtureConfig), CONTROL_PASSWORD: "control-test-password", CONTROL_PUBLIC_URL: "https://control.example.com", MIGRATION_TOKEN: "private-management-token",
   }, {
     sendRoll: async (_config, date, result) => { sent.push({ type: "result", date, number: result.number }); },
     sendAuthentication: async () => { sent.push({ type: "authentication" }); },
@@ -38,7 +38,7 @@ test("Worker control APIs expose results and previews without exposing credentia
   assert.equal(overview.result.number, 123456);
   assert.equal(overview.result.rarity, "trash");
   assert.equal(overview.latest.emailSent, true);
-  assert.doesNotMatch(JSON.stringify(overview), /smtp-private|llm-private|private-management-token/);
+  assert.doesNotMatch(JSON.stringify(overview), /smtp-private|llm-private|private-management-token|control-test-password/);
   const preview = await authorized("/preview/email?type=result");
   assert.equal(preview.status, 200);
   assert.match(preview.headers.get("content-security-policy"), /default-src 'none'/);

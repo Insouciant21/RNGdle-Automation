@@ -17,11 +17,6 @@ export function workerBuildConfig(source, env = {}) {
     }
     config.vars.CONTROL_PUBLIC_URL = url.origin;
   }
-  if (value("ALLOW_SETUP")) {
-    if (!["true", "false"].includes(value("ALLOW_SETUP"))) throw new Error("ALLOW_SETUP must be true or false");
-    config.vars.ALLOW_SETUP = value("ALLOW_SETUP");
-  }
-
   const customDomain = value("CUSTOM_DOMAIN");
   if (customDomain) {
     const zoneName = value("ZONE_NAME");

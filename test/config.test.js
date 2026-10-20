@@ -61,7 +61,7 @@ test("retired bindings no longer affect Worker configuration", async () => {
   };
   const config = await workerConfig({
     ...required, ...retired, BROWSER_TIMEOUT_MS: "90000", MAIL_RETRY_MINUTES: "10", llm_model: "old-model",
-    POLL_SECONDS: "1", CONTROL_PORT: "9000", CONTROL_PASSWORD: "unused-password", CONTROL_COOKIE_SECURE: "false",
+    POLL_SECONDS: "1", CONTROL_PORT: "9000", CONTROL_COOKIE_SECURE: "false",
   });
   assert.equal(config.rngdle.baseUrl, "https://www.rngdle.com");
   assert.deepEqual(splitWorkerBindings(retired), { vars: {}, secrets: {} });

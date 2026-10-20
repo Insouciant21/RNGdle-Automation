@@ -12,11 +12,11 @@ import { fixtureConfig } from "./helpers/cloud-fixture.js";
 const source = JSON.parse(await fs.readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
 
 test("build variables and bulk secrets keep credentials and personal addresses separate", () => {
-  const env = { ...configToEnv(fixtureConfig), MIGRATION_TOKEN: "private-management-token", CLOUDFLARE_API_TOKEN: "private-build-token" };
+  const env = { ...configToEnv(fixtureConfig), CONTROL_PASSWORD: " private-control-password ", MIGRATION_TOKEN: "private-management-token", CLOUDFLARE_API_TOKEN: "private-build-token" };
   const { vars, secrets } = splitWorkerBindings(env);
   assert.equal(vars.SCHEDULE_TIME, fixtureConfig.schedule.time);
   assert.equal(vars.RETURN_LIKES_POLL_MINUTES, "60");
-  for (const name of ["RNGDLE_EMAIL", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM", "MAIL_TO", "LLM_API_KEY", "MIGRATION_TOKEN"]) {
+  for (const name of ["RNGDLE_EMAIL", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM", "MAIL_TO", "LLM_API_KEY", "MIGRATION_TOKEN", "CONTROL_PASSWORD"]) {
     assert.equal(vars[name], undefined);
     assert.equal(secrets[name], env[name]);
   }
@@ -30,13 +30,12 @@ test("build overrides update the deployment target without changing the public t
   const snapshot = structuredClone(source);
   const config = workerBuildConfig(source, {
     WORKER_NAME: "custom-worker", CONTROL_PUBLIC_URL: "https://control.example.com/",
-    CUSTOM_DOMAIN: "control.example.com", ZONE_NAME: "example.com", ALLOW_SETUP: "false",
+    CUSTOM_DOMAIN: "control.example.com", ZONE_NAME: "example.com",
     SCHEDULE_TIME: "09:00", RETURN_LIKES_POLL_MINUTES: "60", RNGDLE_EMAIL: "private@example.com",
   });
   assert.equal(config.name, "custom-worker");
   assert.equal(config.vars.SCHEDULE_TIME, "09:00");
   assert.equal(config.vars.CONTROL_PUBLIC_URL, "https://control.example.com");
-  assert.equal(config.vars.ALLOW_SETUP, "false");
   assert.equal(config.vars.RNGDLE_EMAIL, undefined);
   assert.equal(config.workers_dev, false);
   assert.deepEqual(config.routes, [{ pattern: "control.example.com/*", zone_name: "example.com" }]);
@@ -49,11 +48,10 @@ test("invalid deployment overrides and secrets embedded in plain vars are reject
   for (const env of [
     { CONTROL_PUBLIC_URL: "http://control.example.com" },
     { CONTROL_PUBLIC_URL: "https://user:password@control.example.com" },
-    { ALLOW_SETUP: "yes" },
     { CUSTOM_DOMAIN: "control.example.com" },
     { CUSTOM_DOMAIN: "https://control.example.com/", ZONE_NAME: "example.com" },
   ]) assert.throws(() => workerBuildConfig(source, env));
-  for (const name of ["SMTP_PASSWORD", "RNGDLE_EMAIL", "CONFIG_JSON"]) {
+  for (const name of ["SMTP_PASSWORD", "RNGDLE_EMAIL", "CONFIG_JSON", "CONTROL_PASSWORD"]) {
     assert.throws(() => workerBuildConfig({ ...source, vars: { ...source.vars, [name]: "private" } }), /Use Worker secrets/);
   }
 });
@@ -65,7 +63,7 @@ test("production deployment builds with production vars and stops before deployi
   await fs.mkdir(bin);
   const production = workerBuildConfig(source, {
     WORKER_NAME: "production-worker", CONTROL_PUBLIC_URL: "https://control.example.com",
-    CUSTOM_DOMAIN: "control.example.com", ZONE_NAME: "example.com", ALLOW_SETUP: "false",
+    CUSTOM_DOMAIN: "control.example.com", ZONE_NAME: "example.com",
   });
   await fs.writeFile(path.join(directory, "wrangler.production.jsonc"), JSON.stringify(production));
   const secretsPath = path.join(directory, "bindings.json");
@@ -79,7 +77,7 @@ fs.appendFileSync("commands.jsonl", JSON.stringify({ args, config }) + "\\n");
 if (args[0] === "build" && process.env.FAIL_BUILD === "true") process.exit(17);
 `, { mode: 0o755 });
   const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, SECRETS_PATH: secretsPath };
-  for (const name of ["WORKER_NAME", "CONTROL_PUBLIC_URL", "CUSTOM_DOMAIN", "ZONE_NAME", "ALLOW_SETUP", "CLOUDFLARE_WRANGLER_CONFIG"]) delete env[name];
+  for (const name of ["WORKER_NAME", "CONTROL_PUBLIC_URL", "CUSTOM_DOMAIN", "ZONE_NAME", "CLOUDFLARE_WRANGLER_CONFIG"]) delete env[name];
   const script = fileURLToPath(new URL("../scripts/deploy-production.mjs", import.meta.url));
   const run = (extra = {}) => spawnSync(process.execPath, [script, "--dry-run"], { cwd: directory, env: { ...env, ...extra }, encoding: "utf8" });
   const success = run();
@@ -88,7 +86,7 @@ if (args[0] === "build" && process.env.FAIL_BUILD === "true") process.exit(17);
   assert.deepEqual(commands.map((entry) => entry.args), [["build"], ["exec", "wrangler", "deploy", "--dry-run"]]);
   assert.equal(commands[0].config.name, "production-worker");
   assert.equal(commands[0].config.vars.CONTROL_PUBLIC_URL, "https://control.example.com");
-  assert.equal(commands[0].config.vars.ALLOW_SETUP, "false");
+  assert.equal(commands[0].config.vars.CONTROL_PASSWORD, undefined);
   assert.equal(commands[0].config.vars.SMTP_PORT, "465");
   assert.equal(commands[0].config.vars.SMTP_PASSWORD, undefined);
   assert.deepEqual(commands[0].config.routes, production.routes);
