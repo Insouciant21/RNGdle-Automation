@@ -6,7 +6,6 @@ const ENV_FIELDS = [
   ["SCHEDULE_TIME", ["schedule", "time"]],
   ["RETRY_MINUTES", ["schedule", "retryMinutes"]],
   ["EMAIL_RETRY_MINUTES", ["schedule", "emailRetryMinutes"]],
-  ["RNGDLE_BASE_URL", ["rngdle", "baseUrl"]],
   ["RNGDLE_EMAIL", ["rngdle", "email"], true],
   ["HTTP_TIMEOUT_MS", ["http", "timeoutMs"]],
   ["CONTROL_SESSION_DAYS", ["control", "sessionDays"]],

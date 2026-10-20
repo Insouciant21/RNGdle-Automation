@@ -72,7 +72,7 @@ export function normalizeConfig(raw) {
       emailRetryMinutes: positiveInteger(raw.schedule?.emailRetryMinutes ?? 1, "schedule.emailRetryMinutes"),
     },
     rngdle: {
-      baseUrl: requiredString(raw.rngdle?.baseUrl ?? "https://www.rngdle.com", "rngdle.baseUrl").replace(/\/$/, ""),
+      baseUrl: "https://www.rngdle.com",
       email: requiredString(raw.rngdle?.email, "rngdle.email"),
     },
     http: {
@@ -134,7 +134,6 @@ export function normalizeConfig(raw) {
 
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: config.timezone }).format();
-    new URL(config.rngdle.baseUrl);
     new URL(config.control.publicUrl);
   } catch (error) {
     throw new Error(`Invalid timezone or URL in configuration: ${error.message}`);

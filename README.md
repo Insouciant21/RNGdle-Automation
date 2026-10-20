@@ -64,7 +64,6 @@ pnpm cloudflare backup backups/workers.json
 | `TZ` | var | `Asia/Shanghai` | 调度时区 |
 | `SCHEDULE_TIME` | var | `08:02` | 每日执行时间（HH:mm） |
 | `RETRY_MINUTES` / `EMAIL_RETRY_MINUTES` | var | `30` / `1` | RNGdle / 邮件重试间隔 |
-| `RNGDLE_BASE_URL` | var | 官网 | RNGdle 站点地址 |
 | `RNGDLE_EMAIL` | Secret | 必填 | RNGdle 账号邮箱 |
 | `HTTP_TIMEOUT_MS` | var | `45000` | 出站请求超时 |
 | `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_REQUIRE_TLS` | var | 见 wrangler.jsonc | SMTP 传输 |

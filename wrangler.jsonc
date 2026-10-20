@@ -18,7 +18,6 @@
     "EMAIL_RETRY_MINUTES": "1",
     "HTTP_TIMEOUT_MS": "45000",
     "CONTROL_SESSION_DAYS": "7",
-    "RNGDLE_BASE_URL": "https://www.rngdle.com",
     "SMTP_PORT": "587",
     "SMTP_SECURE": "false",
     "SMTP_REQUIRE_TLS": "true",
