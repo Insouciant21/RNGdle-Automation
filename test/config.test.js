@@ -15,12 +15,12 @@ const required = {
 test("minimal Worker bindings use defaults and Durable Object storage", async () => {
   const storage = new MemoryStorage();
   const config = await workerConfig(required, storage);
-  assert.equal(config.timezone, "Asia/Shanghai");
+  assert.equal(config.timezone, "UTC");
   assert.equal(config.rngdle.baseUrl, "https://www.rngdle.com");
-  for (const name of ["RNGDLE_BASE_URL", "HTTP_TIMEOUT_MS", "LLM_TIMEOUT_MS"]) {
+  for (const name of ["TZ", "SCHEDULE_TIME", "RNGDLE_BASE_URL", "HTTP_TIMEOUT_MS", "LLM_TIMEOUT_MS"]) {
     assert.equal(name in configToEnv(config), false);
   }
-  assert.deepEqual(config.schedule, { time: "08:02", retryMinutes: 30, emailRetryMinutes: 1 });
+  assert.deepEqual(config.schedule, { time: "00:00", retryMinutes: 30, emailRetryMinutes: 1 });
   assert.deepEqual(config.control, { publicUrl: required.CONTROL_PUBLIC_URL, sessionDays: 7 });
   assert.deepEqual(config.storage, { adapter: storage });
   assert.equal(config.http.timeoutMs, 45_000);
@@ -47,9 +47,8 @@ test("missing required Worker bindings fail before a workflow can run", async ()
   }
 });
 
-test("deployment variables validate types, schedules, timezones and URLs", async () => {
+test("deployment variables validate types and URLs", async () => {
   for (const extra of [
-    { SCHEDULE_TIME: "25:00" }, { TZ: "invalid" },
     { RETURN_LIKES_POLL_MINUTES: "0" }, { POEM_ENABLED: "yes" }, { SMTP_PORT: "invalid" },
     { CONTROL_PUBLIC_URL: "invalid" },
   ]) await assert.rejects(workerConfig({ ...required, ...extra }));
@@ -57,6 +56,7 @@ test("deployment variables validate types, schedules, timezones and URLs", async
 
 test("retired bindings no longer affect Worker configuration", async () => {
   const retired = {
+    TZ: "invalid", SCHEDULE_TIME: "25:00",
     RNGDLE_BASE_URL: "https://other.example.com", HTTP_TIMEOUT_MS: "1", LLM_TIMEOUT_MS: "1",
   };
   const config = await workerConfig({
@@ -64,6 +64,8 @@ test("retired bindings no longer affect Worker configuration", async () => {
     POLL_SECONDS: "1", CONTROL_PORT: "9000", CONTROL_COOKIE_SECURE: "false",
   });
   assert.equal(config.rngdle.baseUrl, "https://www.rngdle.com");
+  assert.equal(config.timezone, "UTC");
+  assert.equal(config.schedule.time, "00:00");
   assert.deepEqual(splitWorkerBindings(retired), { vars: {}, secrets: {} });
   assert.equal(config.http.timeoutMs, 45_000);
   assert.equal(config.llm.timeoutMs, 60_000);

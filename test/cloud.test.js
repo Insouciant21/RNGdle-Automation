@@ -5,7 +5,7 @@ import { configToEnv } from "../src/cloud/config.js";
 import { advanceWorkflow } from "../src/cloud/workflow.js";
 import { nextReturnLikeWake, nextWake } from "../src/cloud/schedule.js";
 import { AuthenticationRequiredError } from "../src/rngdle.js";
-import { localParts } from "../src/schedule.js";
+import { utcDate } from "../src/schedule.js";
 import { createReturnLikeState } from "../src/rngdle-likes.js";
 
 import { MemoryStorage, fixtureConfig, bundle } from "./helpers/cloud-fixture.js";
@@ -77,16 +77,19 @@ test("authentication failure pauses the stage and sends one notification", async
   assert.equal(state.days["2026-10-18"].nextRetryAt, null);
 });
 
-test("alarms respect daily schedule, stage retry deadlines, and completed days", () => {
+test("alarms run at UTC midnight, recover unfinished work, and respect stage retry deadlines", () => {
   const { config } = setup();
   const state = empty();
-  assert.equal(nextWake(config, state, new Date("2026-10-18T00:01:00Z")), Date.parse("2026-10-18T00:02:00Z"));
+  state.days["2026-10-17"] = { status: "success" };
+  assert.equal(nextWake(config, state, new Date("2026-10-17T23:59:59.999Z")), Date.parse("2026-10-18T00:00:00Z"));
+  assert.equal(nextWake(config, state, new Date("2026-10-18T00:00:00Z")), Date.parse("2026-10-18T00:00:01Z"));
+  assert.equal(nextWake(config, state, new Date("2026-10-18T00:01:00Z")), Date.parse("2026-10-18T00:01:01Z"));
   state.days["2026-10-18"] = { status: "success" };
-  assert.equal(nextWake(config, state, new Date("2026-10-18T00:03:00Z")), Date.parse("2026-10-19T00:02:00Z"));
+  assert.equal(nextWake(config, state, new Date("2026-10-18T00:03:00Z")), Date.parse("2026-10-19T00:00:00Z"));
   state.days["2026-10-18"] = { status: "email_pending", lastAttemptAt: "2026-10-18T00:02:00Z", nextEmailRetryAt: "2026-10-18T00:04:23Z", nextRetryAt: "2026-10-18T00:04:23Z" };
   assert.equal(nextWake(config, state, new Date("2026-10-18T00:03:00Z")), Date.parse("2026-10-18T00:04:23Z"));
-  config.schedule.time = "09:00";
-  assert.equal(nextWake(config, state, new Date("2026-10-18T00:03:00Z")), Date.parse("2026-10-18T01:00:00Z"));
+  state.days["2026-10-18"].nextRetryAt = null;
+  assert.equal(nextWake(config, state, new Date("2026-10-18T00:03:00Z")), Date.parse("2026-10-18T00:04:23Z"));
 });
 
 test("return-like polling chooses an independent short alarm and resets after the enabled baseline", () => {
@@ -100,16 +103,19 @@ test("return-like polling chooses an independent short alarm and resets after th
   assert.equal(nextReturnLikeWake(config, null, now), Infinity);
 });
 
-test("alarms schedule across DST using real timezone instants", () => {
-  const { config } = setup(); config.timezone = "America/New_York"; config.schedule.time = "08:02";
-  const state = { version: 1, days: { "2026-03-07": { status: "success" } } };
-  assert.equal(nextWake(config, state, new Date("2026-03-07T14:00:00Z")), Date.parse("2026-03-08T12:02:00Z"));
+test("a stage retry after midnight cannot delay the next UTC day", () => {
+  const { config } = setup();
+  const state = { version: 1, days: { "2026-10-18": {
+    status: "failed", lastAttemptAt: "2026-10-18T23:50:00Z", nextRngdleRetryAt: "2026-10-19T00:20:00Z",
+  } } };
+  assert.equal(nextWake(config, state, new Date("2026-10-18T23:59:00Z")), Date.parse("2026-10-19T00:00:00Z"));
 });
 
 test("import requires a bearer token and empty storage, ignoring the old password and sessions", async () => {
   const { storage } = setup();
   const service = new AutomationService(storage, { ...fixtureBindings(), MIGRATION_TOKEN: "migration-private", CONTROL_PUBLIC_URL: "https://control.example.com" });
   const data = await bundle();
+  data.config = { ...data.config, timezone: "Asia/Shanghai", schedule: { ...data.config.schedule, time: "08:02" } };
   assert.equal((await service.fetch(request("/__migration/import", data))).status, 404);
   const headers = { Authorization: "Bearer migration-private" };
   assert.equal((await service.fetch(request("/__migration/import", data, headers))).status, 200);
@@ -121,6 +127,8 @@ test("import requires a bearer token and empty storage, ignoring the old passwor
   assert.match(login.headers.get("set-cookie"), /HttpOnly.*Secure/);
   assert.equal("password" in await storage.get("auth"), false);
   const backup = await (await service.fetch(request("/__migration/export", undefined, headers))).json();
+  assert.equal(backup.config.timezone, "UTC");
+  assert.equal(backup.config.schedule.time, "00:00");
   assert.equal("auth" in backup, false);
   assert.doesNotMatch(JSON.stringify(backup), /control-test-password/);
 });
@@ -177,7 +185,7 @@ test("backups restore return-like history and daily limits without resetting the
 
 test("concurrent alarms serialize and never generate a second roll", async () => {
   const { storage } = setup();
-  const config = structuredClone(fixtureConfig); config.schedule.time = "00:00"; config.poem.enabled = false;
+  const config = structuredClone(fixtureConfig); config.poem.enabled = false;
   await storage.put("meta", { paused: false, importedAt: new Date().toISOString() });
   let rolls = 0;
   const service = new AutomationService(storage, { ...fixtureBindings(config), CONTROL_PUBLIC_URL: "https://control.example.com" }, {
@@ -185,7 +193,7 @@ test("concurrent alarms serialize and never generate a second roll", async () =>
   });
   await Promise.all([service.tick(), service.tick(), service.tick()]);
   assert.equal(rolls, 1);
-  assert.equal((await storage.get("state")).days[localParts(new Date(), config.timezone).date].status, "success");
+  assert.equal((await storage.get("state")).days[utcDate(new Date())].status, "success");
   assert.ok(await storage.getAlarm());
 });
 
@@ -193,7 +201,7 @@ test("an alarm runs the return-like workflow without rerunning a completed daily
   const { storage } = setup();
   const config = structuredClone(fixtureConfig);
   config.likes = { enabled: true, pollMinutes: 10, maxPerDay: 10, lookbackDays: 7 };
-  const today = localParts(new Date(), config.timezone).date;
+  const today = utcDate(new Date());
   await storage.put("state", { version: 1, days: { [today]: { status: "success" } } });
   await storage.put("meta", { paused: false, importedAt: new Date().toISOString() });
   let calls = 0;
@@ -250,13 +258,12 @@ test("individual environment variables round-trip through the config and missing
   assert.equal(await partial.hasConfig(), false);
   await assert.rejects(() => partial.config(), /smtp\.to must contain at least one recipient/);
   await assert.rejects(() => new AutomationService(storage, configToEnv(fixtureConfig)).config(), /CONTROL_PUBLIC_URL is required/);
-  await assert.rejects(() => new AutomationService(storage, { ...env, CONTROL_PUBLIC_URL: "invalid" }).config(), /Invalid timezone or URL/);
+  await assert.rejects(() => new AutomationService(storage, { ...env, CONTROL_PUBLIC_URL: "invalid" }).config(), /Invalid URL/);
 });
 
 test("an expired daily session prevents a return-like check in the same alarm", async () => {
   const storage = new MemoryStorage();
   const config = structuredClone(fixtureConfig);
-  config.schedule.time = "00:00";
   config.likes.enabled = true;
   await storage.put("meta", { paused: false, importedAt: new Date().toISOString() });
   const service = new AutomationService(storage, { ...configToEnv(config), CONTROL_PUBLIC_URL: "https://control.example.com" }, {

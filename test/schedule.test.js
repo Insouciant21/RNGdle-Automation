@@ -1,27 +1,27 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isWorkflowDue, localParts, nextRetryAt } from "../src/schedule.js";
+import { isWorkflowDue, utcDate, nextRetryAt } from "../src/schedule.js";
 
-test("localParts uses the configured UTC+8 timezone", () => {
-  assert.deepEqual(localParts(new Date("2026-07-29T00:02:00.000Z"), "Asia/Shanghai"), {
-    date: "2026-07-29",
-    minutes: 8 * 60 + 2,
-  });
+test("daily records use UTC dates across midnight and local timezone offsets", () => {
+  assert.equal(utcDate(new Date("2026-07-28T23:59:59.999Z")), "2026-07-28");
+  assert.equal(utcDate(new Date("2026-07-29T00:00:00Z")), "2026-07-29");
+  assert.equal(utcDate(new Date("2026-07-29T07:59:59+08:00")), "2026-07-28");
 });
 
-test("workflow becomes due at 08:02 and not before", () => {
-  const base = { timezone: "Asia/Shanghai", scheduleTime: "08:02" };
-  assert.equal(isWorkflowDue({ ...base, now: new Date("2026-07-28T23:59:00Z") }), false);
-  assert.equal(isWorkflowDue({ ...base, now: new Date("2026-07-29T00:02:00Z") }), true);
+test("a completed day becomes due again at the next UTC midnight", () => {
+  const days = { "2026-07-28": { status: "success" } };
+  for (const [instant, due] of [["2026-07-28T23:59:59.999Z", false], ["2026-07-29T00:00:00Z", true]]) {
+    const now = new Date(instant);
+    assert.equal(isWorkflowDue({ now, dayState: days[utcDate(now)] }), due);
+  }
 });
 
 test("successful days do not rerun and failed days respect next retry", () => {
   const base = {
-    timezone: "Asia/Shanghai",
-    scheduleTime: "08:02",
     now: new Date("2026-07-29T01:00:00Z"),
   };
   assert.equal(isWorkflowDue({ ...base, dayState: { status: "success" } }), false);
+  assert.equal(isWorkflowDue({ ...base, dayState: { status: "auth_required" } }), false);
   assert.equal(
     isWorkflowDue({
       ...base,
@@ -40,8 +40,6 @@ test("successful days do not rerun and failed days respect next retry", () => {
 
 test("email-pending days use the email retry timestamp", () => {
   const base = {
-    timezone: "Asia/Shanghai",
-    scheduleTime: "08:02",
     now: new Date("2026-07-29T01:00:00Z"),
   };
   assert.equal(
@@ -75,7 +73,7 @@ test("nextRetryAt adds the configured interval", () => {
 });
 
 test("poem-pending days respect their own retry timestamp", () => {
-  const base = { timezone: "Asia/Shanghai", scheduleTime: "08:02", now: new Date("2026-09-19T01:00:00Z") };
+  const base = { now: new Date("2026-09-19T01:00:00Z") };
   const dayState = { status: "poem_pending", lastAttemptAt: "2026-09-19T00:50:00Z", nextPoemRetryAt: "2026-09-19T01:05:00Z", nextEmailRetryAt: "2026-09-19T00:51:00Z" };
   assert.equal(isWorkflowDue({ ...base, dayState }), false);
   assert.equal(isWorkflowDue({ ...base, dayState: { ...dayState, nextPoemRetryAt: "2026-09-19T00:55:00Z" } }), true);

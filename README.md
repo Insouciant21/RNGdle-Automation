@@ -34,11 +34,11 @@ pnpm build
 
 ## 运行行为
 
-- 默认调度：上海时间 `08:02`，时区和时间由 `TZ`、`SCHEDULE_TIME` 变量配置
+- 每日任务固定在 UTC `00:00`（北京时间 `08:00`）执行，任务日期按 UTC 计算
 - RNGdle 失败默认 30 分钟重试，诗歌 5 分钟，邮件 1 分钟
 - 已完成日期直接跳过；已有 roll 或诗歌会复用，不重复生成或提交
 - 回赞默认每 60 分钟检查一次，每天最多 10 次；同一用户的多个通知只回赞一次，已有自己的心或 roll 过旧时跳过
-- 所有配置（调度、SMTP、回赞、LLM）都来自独立的 Workers 变量/Secret，修改后重新部署生效
+- SMTP、重试、回赞和 LLM 配置来自独立的 Workers 变量/Secret，修改后重新部署生效
 - Control Session 使用 Secure、HttpOnly Cookie，写操作要求同源和 CSRF Token
 - SMTP 接受邮件后、状态保存前中断仍可能导致重复投递，系统不承诺严格一次发送
 
@@ -57,12 +57,10 @@ pnpm cloudflare backup backups/workers.json
 
 ## 配置与安全
 
-项目仅支持 Cloudflare Workers。配置示例 `.dev.vars.example` 只列必填项与常用功能开关；调度、重试、回赞和 LLM 参数已有默认值，可通过 `wrangler.jsonc` 或 Workers Builds 变量覆盖。HTTP/SMTP 超时固定为 45 秒，LLM 请求超时固定为 60 秒。凭证和个人邮箱使用 Secret，构建脚本会过滤这些值。`MIGRATION_TOKEN` 是管理工具密钥，不是 Control 密码；SMTP、LLM 和管理凭证不会发送到前端。
+项目仅支持 Cloudflare Workers。配置示例 `.dev.vars.example` 只列必填项与常用功能开关；重试、回赞和 LLM 参数已有默认值，可通过 `wrangler.jsonc` 或 Workers Builds 变量覆盖。每日任务固定在 UTC `00:00`，HTTP/SMTP 超时固定为 45 秒，LLM 请求超时固定为 60 秒。凭证和个人邮箱使用 Secret，构建脚本会过滤这些值。`MIGRATION_TOKEN` 是管理工具密钥，不是 Control 密码；SMTP、LLM 和管理凭证不会发送到前端。
 
 | 变量 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- |
-| `TZ` | var | `Asia/Shanghai` | 调度时区 |
-| `SCHEDULE_TIME` | var | `08:02` | 每日执行时间（HH:mm） |
 | `RETRY_MINUTES` / `EMAIL_RETRY_MINUTES` | var | `30` / `1` | RNGdle / 邮件重试间隔 |
 | `RNGDLE_EMAIL` | Secret | 必填 | RNGdle 账号邮箱 |
 | `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_REQUIRE_TLS` | var | 见 wrangler.jsonc | SMTP 传输 |

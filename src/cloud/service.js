@@ -6,7 +6,7 @@ import { createRngdleSession, isRngdleUrl } from "../rngdle-http.js";
 import { fetchHome, followAuthenticationLink } from "../rngdle.js";
 import { inspectPoem } from "../poem-http.js";
 import { generatePoem } from "../poem.js";
-import { localParts, isWorkflowDue } from "../schedule.js";
+import { utcDate, isWorkflowDue } from "../schedule.js";
 import { errorSummary, log, withLogSink } from "../logger.js";
 import { workerConfig } from "./config.js";
 import { nextWake } from "./schedule.js";
@@ -109,12 +109,10 @@ export class AutomationService {
       if (meta.paused || meta.authenticated === false) return;
       const config = await this.config();
       const now = new Date();
-      const { date } = localParts(now, config.timezone);
+      const date = utcDate(now);
       const state = await this.state();
       try {
-        if (state.days[date]?.status !== "auth_required" && isWorkflowDue({
-          now, timezone: config.timezone, scheduleTime: config.schedule.time, dayState: state.days[date],
-        })) {
+        if (isWorkflowDue({ now, dayState: state.days[date] })) {
           // Arm recovery before I/O; an eviction must never erase the next wake.
           await this.storage.setAlarm(Date.now() + 10 * 60000);
           await advanceWorkflow(config, state, date, this.dependencies);

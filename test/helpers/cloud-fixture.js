@@ -13,8 +13,8 @@ export class MemoryStorage {
 }
 
 export const fixtureConfig = {
-  timezone: "Asia/Shanghai",
-  schedule: { time: "08:02", retryMinutes: 30, emailRetryMinutes: 1 },
+  timezone: "UTC",
+  schedule: { time: "00:00", retryMinutes: 30, emailRetryMinutes: 1 },
   rngdle: { baseUrl: "https://www.rngdle.com", email: "player@example.com" },
   http: { timeoutMs: 45000 },
   control: { sessionDays: 7, publicUrl: "https://control.example.com" },

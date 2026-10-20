@@ -18,6 +18,7 @@ test("Workers runtime serves authenticated Astro views without a settings page",
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.locator("#roll-number")).toHaveText("123456");
   await expect(page.locator("#poem-text")).toHaveText("mountains rise");
+  await expect(page.locator("#schedule-meta")).toHaveText("00:00 UTC");
   await page.getByRole("tab", { name: "Logs", exact: true }).click();
   await expect(page.locator("#log-panel")).toContainText("Backup imported");
   await page.getByRole("tab", { name: "Authentication", exact: true }).click();
@@ -57,7 +58,7 @@ test("Workers rejects missing CSRF and removed endpoints, keeping deployment sec
   expect(setup.status()).toBe(404);
   const setupPage = await request.get("/setup");
   expect(setupPage.status()).toBe(404);
-  expect(overviewText).toContain("\"time\":\"08:02\"");
+  expect((await overview.json()).schedule).toMatchObject({ time: "00:00", timezone: "UTC" });
   const duplicate = await request.post("/__migration/import", { headers: { Authorization: "Bearer e2e-migration-token" }, data: await bundle() });
   expect(duplicate.status()).toBe(409);
   const oversized = await request.post("/api/auth/login", { data: { password: "x".repeat(40000) } });

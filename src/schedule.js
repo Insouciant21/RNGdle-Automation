@@ -1,50 +1,23 @@
-const formatters = new Map();
-
-function getFormatter(timezone) {
-  if (!formatters.has(timezone)) {
-    formatters.set(
-      timezone,
-      new Intl.DateTimeFormat("en-CA", {
-        timeZone: timezone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-      }),
-    );
-  }
-  return formatters.get(timezone);
+export function utcDate(now) {
+  return now.toISOString().slice(0, 10);
 }
 
-export function localParts(now, timezone) {
-  const parts = Object.fromEntries(
-    getFormatter(timezone)
-      .formatToParts(now)
-      .filter((part) => part.type !== "literal")
-      .map((part) => [part.type, part.value]),
-  );
-  return {
-    date: `${parts.year}-${parts.month}-${parts.day}`,
-    minutes: Number(parts.hour) * 60 + Number(parts.minute),
-  };
+export function workflowRetryAt(dayState) {
+  return dayState?.status === "poem_pending"
+    ? dayState.nextPoemRetryAt ?? dayState.nextRetryAt
+    : dayState?.status === "email_pending"
+    ? dayState.nextEmailRetryAt ?? dayState.nextRetryAt
+    : dayState?.nextRngdleRetryAt ?? dayState?.nextRetryAt;
 }
 
-export function isWorkflowDue({ now, timezone, scheduleTime, dayState }) {
-  const current = localParts(now, timezone);
-  const [hour, minute] = scheduleTime.split(":").map(Number);
-  if (dayState?.status === "success" || current.minutes < hour * 60 + minute) {
+export function isWorkflowDue({ now, dayState }) {
+  if (dayState?.status === "success" || dayState?.status === "auth_required") {
     return false;
   }
   if (!dayState?.lastAttemptAt) {
     return true;
   }
-  const retryAt = dayState.status === "poem_pending"
-    ? dayState.nextPoemRetryAt ?? dayState.nextRetryAt
-    : dayState.status === "email_pending"
-    ? dayState.nextEmailRetryAt ?? dayState.nextRetryAt
-    : dayState.nextRngdleRetryAt ?? dayState.nextRetryAt;
+  const retryAt = workflowRetryAt(dayState);
   return !retryAt || now >= new Date(retryAt);
 }
 

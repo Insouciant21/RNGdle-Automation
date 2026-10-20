@@ -24,14 +24,6 @@ function optionalString(value) {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 }
 
-function validateTime(value) {
-  const time = requiredString(value, "schedule.time");
-  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) {
-    throw new Error("Configuration field schedule.time must use HH:mm (24-hour) format");
-  }
-  return time;
-}
-
 // Validates and defaults the configuration built from Worker variables.
 export function normalizeConfig(raw) {
   const configuredRecipients = raw.smtp?.to;
@@ -65,9 +57,9 @@ export function normalizeConfig(raw) {
     throw new Error("smtp.oauth.clientId, clientSecret, refreshToken, and accessUrl are required for OAuth2 authentication");
   }
   const config = {
-    timezone: requiredString(raw.timezone ?? "Asia/Shanghai", "timezone"),
+    timezone: "UTC",
     schedule: {
-      time: validateTime(raw.schedule?.time ?? "08:02"),
+      time: "00:00",
       retryMinutes: positiveInteger(raw.schedule?.retryMinutes ?? 30, "schedule.retryMinutes"),
       emailRetryMinutes: positiveInteger(raw.schedule?.emailRetryMinutes ?? 1, "schedule.emailRetryMinutes"),
     },
@@ -133,10 +125,9 @@ export function normalizeConfig(raw) {
   if (config.poem.enabled && !config.llm.apiKey) throw new Error("LLM_API_KEY is required when POEM_ENABLED=true");
 
   try {
-    new Intl.DateTimeFormat("en-US", { timeZone: config.timezone }).format();
     new URL(config.control.publicUrl);
   } catch (error) {
-    throw new Error(`Invalid timezone or URL in configuration: ${error.message}`);
+    throw new Error(`Invalid URL in configuration: ${error.message}`);
   }
 
   return config;

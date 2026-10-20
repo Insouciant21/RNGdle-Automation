@@ -11,8 +11,6 @@
   "limits": { "cpu_ms": 30000 },
   "vars": {
     "CONTROL_PUBLIC_URL": "https://your-worker-name.your-subdomain.workers.dev",
-    "TZ": "Asia/Shanghai",
-    "SCHEDULE_TIME": "08:02",
     "RETRY_MINUTES": "30",
     "EMAIL_RETRY_MINUTES": "1",
     "CONTROL_SESSION_DAYS": "7",

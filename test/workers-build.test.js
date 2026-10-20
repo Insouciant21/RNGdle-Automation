@@ -14,7 +14,8 @@ const source = JSON.parse(await fs.readFile(new URL("../wrangler.jsonc", import.
 test("build variables and bulk secrets keep credentials and personal addresses separate", () => {
   const env = { ...configToEnv(fixtureConfig), CONTROL_PASSWORD: " private-control-password ", MIGRATION_TOKEN: "private-management-token", CLOUDFLARE_API_TOKEN: "private-build-token" };
   const { vars, secrets } = splitWorkerBindings(env);
-  assert.equal(vars.SCHEDULE_TIME, fixtureConfig.schedule.time);
+  assert.equal(vars.SCHEDULE_TIME, undefined);
+  assert.equal(vars.TZ, undefined);
   assert.equal(vars.RETURN_LIKES_POLL_MINUTES, "60");
   for (const name of ["RNGDLE_EMAIL", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM", "MAIL_TO", "LLM_API_KEY", "MIGRATION_TOKEN", "CONTROL_PASSWORD"]) {
     assert.equal(vars[name], undefined);
@@ -31,10 +32,11 @@ test("build overrides update the deployment target without changing the public t
   const config = workerBuildConfig(source, {
     WORKER_NAME: "custom-worker", CONTROL_PUBLIC_URL: "https://control.example.com/",
     CUSTOM_DOMAIN: "control.example.com", ZONE_NAME: "example.com",
-    SCHEDULE_TIME: "09:00", RETURN_LIKES_POLL_MINUTES: "60", RNGDLE_EMAIL: "private@example.com",
+    TZ: "America/New_York", SCHEDULE_TIME: "09:00", RETURN_LIKES_POLL_MINUTES: "60", RNGDLE_EMAIL: "private@example.com",
   });
   assert.equal(config.name, "custom-worker");
-  assert.equal(config.vars.SCHEDULE_TIME, "09:00");
+  assert.equal(config.vars.SCHEDULE_TIME, undefined);
+  assert.equal(config.vars.TZ, undefined);
   assert.equal(config.vars.CONTROL_PUBLIC_URL, "https://control.example.com");
   assert.equal(config.vars.RNGDLE_EMAIL, undefined);
   assert.equal(config.workers_dev, false);

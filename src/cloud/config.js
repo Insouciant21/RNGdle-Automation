@@ -2,8 +2,6 @@ import { normalizeConfig } from "../config.js";
 
 // Worker variable names, configuration paths, and secret classification.
 const ENV_FIELDS = [
-  ["TZ", ["timezone"]],
-  ["SCHEDULE_TIME", ["schedule", "time"]],
   ["RETRY_MINUTES", ["schedule", "retryMinutes"]],
   ["EMAIL_RETRY_MINUTES", ["schedule", "emailRetryMinutes"]],
   ["RNGDLE_EMAIL", ["rngdle", "email"], true],
