@@ -18,7 +18,7 @@ test("buildRollMessage renders the RNGdle result hierarchy", () => {
     badges: [{ emoji: "x", label: "Mini Scramble", score: 579 }],
   });
 
-  assert.match(message.subject, /534461 \(\+2795 EP\)/);
+  assert.equal(message.subject, "[RNGdle] 2026-07-29: 534461 (+2795 EP)");
   assert.deepEqual(message.from, { name: "RNGdle Today", address: "sender@example.com" });
   assert.match(message.text, /Total EP: 865,460/);
   assert.match(message.html, />534461</);
@@ -48,6 +48,7 @@ test("mail templates escape untrusted display values", () => {
   assert.doesNotMatch(authentication.html, /<script>alert/);
   assert.match(authentication.html, /&lt;script&gt;/);
   assert.deepEqual(authentication.from, { name: "RNGdle Today", address: "sender@example.com" });
+  assert.equal(authentication.subject, "[RNGdle] Login required");
 });
 
 test("saved poems appear in both mail formats with escaped HTML", () => {

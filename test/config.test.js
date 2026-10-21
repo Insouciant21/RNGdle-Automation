@@ -17,7 +17,7 @@ test("minimal Worker bindings use defaults and Durable Object storage", async ()
   const config = await workerConfig(required, storage);
   assert.equal(config.timezone, "UTC");
   assert.equal(config.rngdle.baseUrl, "https://www.rngdle.com");
-  for (const name of ["TZ", "SCHEDULE_TIME", "RNGDLE_BASE_URL", "HTTP_TIMEOUT_MS", "LLM_TIMEOUT_MS"]) {
+  for (const name of ["TZ", "SCHEDULE_TIME", "RNGDLE_BASE_URL", "HTTP_TIMEOUT_MS", "LLM_TIMEOUT_MS", "MAIL_FROM_NAME", "MAIL_SUBJECT_PREFIX"]) {
     assert.equal(name in configToEnv(config), false);
   }
   assert.deepEqual(config.schedule, { time: "00:00", retryMinutes: 30, emailRetryMinutes: 1 });
@@ -58,6 +58,7 @@ test("retired bindings no longer affect Worker configuration", async () => {
   const retired = {
     TZ: "invalid", SCHEDULE_TIME: "25:00",
     RNGDLE_BASE_URL: "https://other.example.com", HTTP_TIMEOUT_MS: "1", LLM_TIMEOUT_MS: "1",
+    MAIL_FROM_NAME: "Custom sender", MAIL_SUBJECT_PREFIX: "[Custom]",
   };
   const config = await workerConfig({
     ...required, ...retired, BROWSER_TIMEOUT_MS: "90000", MAIL_RETRY_MINUTES: "10", llm_model: "old-model",
@@ -66,6 +67,7 @@ test("retired bindings no longer affect Worker configuration", async () => {
   assert.equal(config.rngdle.baseUrl, "https://www.rngdle.com");
   assert.equal(config.timezone, "UTC");
   assert.equal(config.schedule.time, "00:00");
+  assert.deepEqual(config.mail, { fromName: "RNGdle Today", subjectPrefix: "[RNGdle]" });
   assert.deepEqual(splitWorkerBindings(retired), { vars: {}, secrets: {} });
   assert.equal(config.http.timeoutMs, 45_000);
   assert.equal(config.llm.timeoutMs, 60_000);

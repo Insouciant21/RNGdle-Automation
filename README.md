@@ -1,6 +1,6 @@
 # RNGdle Automation
 
-Astro 控制台与 Cloudflare Workers 每日自动化服务。默认每天按配置时区执行 RNGdle roll，可选生成并提交诗歌，再通过 SMTP 发送结果邮件。
+Astro 控制台与 Cloudflare Workers 每日自动化服务。每天在 UTC `00:00` 执行 RNGdle roll，可选生成并提交诗歌，再通过 SMTP 发送结果邮件。
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Insouciant21/RNGdle-Automation)
 
@@ -36,6 +36,7 @@ pnpm build
 
 - 每日任务固定在 UTC `00:00`（北京时间 `08:00`）执行，任务日期按 UTC 计算
 - RNGdle 失败默认 30 分钟重试，诗歌 5 分钟，邮件 1 分钟
+- 邮件发件人名称固定为 `RNGdle Today`，标题前缀固定为 `[RNGdle]`
 - 已完成日期直接跳过；已有 roll 或诗歌会复用，不重复生成或提交
 - 回赞默认每 60 分钟检查一次，每天最多 10 次；同一用户的多个通知只回赞一次，已有自己的心或 roll 过旧时跳过
 - SMTP、重试、回赞和 LLM 配置来自独立的 Workers 变量/Secret，修改后重新部署生效
@@ -68,7 +69,6 @@ pnpm cloudflare backup backups/workers.json
 | `MAIL_FROM` | Secret | `SMTP_USER` | 仅发件地址不同时填写 |
 | `SMTP_PASSWORD` | Secret | 密码认证时必填 | SMTP 凭证 |
 | `SMTP_AUTH_MODE`、`SMTP_OAUTH_*` | var / Secret | `password` | 认证方式（OAuth 凭证为 Secret） |
-| `MAIL_FROM_NAME`、`MAIL_SUBJECT_PREFIX` | var | 同本地默认 | 发件外观 |
 | `POEM_ENABLED`、`POEM_RETRY_MINUTES` | var | `false` / `5` | 诗歌开关 |
 | `LLM_ENDPOINT`、`LLM_MODEL`、`LLM_MAX_TOKENS`、`LLM_MAX_ATTEMPTS`、`LLM_THINKING` | var | 见 wrangler.jsonc | 作诗模型参数 |
 | `LLM_API_KEY` | Secret | 开启诗歌时必填 | 作诗模型密钥 |

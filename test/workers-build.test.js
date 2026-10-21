@@ -33,10 +33,13 @@ test("build overrides update the deployment target without changing the public t
     WORKER_NAME: "custom-worker", CONTROL_PUBLIC_URL: "https://control.example.com/",
     CUSTOM_DOMAIN: "control.example.com", ZONE_NAME: "example.com",
     TZ: "America/New_York", SCHEDULE_TIME: "09:00", RETURN_LIKES_POLL_MINUTES: "60", RNGDLE_EMAIL: "private@example.com",
+    MAIL_FROM_NAME: "Custom sender", MAIL_SUBJECT_PREFIX: "[Custom]",
   });
   assert.equal(config.name, "custom-worker");
   assert.equal(config.vars.SCHEDULE_TIME, undefined);
   assert.equal(config.vars.TZ, undefined);
+  assert.equal(config.vars.MAIL_FROM_NAME, undefined);
+  assert.equal(config.vars.MAIL_SUBJECT_PREFIX, undefined);
   assert.equal(config.vars.CONTROL_PUBLIC_URL, "https://control.example.com");
   assert.equal(config.vars.RNGDLE_EMAIL, undefined);
   assert.equal(config.workers_dev, false);

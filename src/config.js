@@ -92,8 +92,8 @@ export function normalizeConfig(raw) {
       to: recipients.map((recipient, index) => requiredString(recipient, `smtp.to[${index}]`)),
     },
     mail: {
-      fromName: requiredString(raw.mail?.fromName ?? "RNGdle Today", "mail.fromName"),
-      subjectPrefix: requiredString(raw.mail?.subjectPrefix ?? "[RNGdle]", "mail.subjectPrefix"),
+      fromName: "RNGdle Today",
+      subjectPrefix: "[RNGdle]",
     },
     poem: {
       enabled: booleanValue(raw.poem?.enabled ?? false, "poem.enabled"),

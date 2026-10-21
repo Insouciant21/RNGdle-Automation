@@ -18,8 +18,6 @@
     "SMTP_SECURE": "false",
     "SMTP_REQUIRE_TLS": "true",
     "SMTP_AUTH_MODE": "password",
-    "MAIL_FROM_NAME": "RNGdle Today",
-    "MAIL_SUBJECT_PREFIX": "[RNGdle]",
     "POEM_ENABLED": "false",
     "POEM_RETRY_MINUTES": "5",
     "RETURN_LIKES_ENABLED": "false",

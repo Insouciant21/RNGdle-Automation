@@ -19,8 +19,6 @@ const ENV_FIELDS = [
   ["SMTP_OAUTH_ACCESS_URL", ["smtp", "oauth", "accessUrl"], true],
   ["MAIL_FROM", ["smtp", "from"], true],
   ["MAIL_TO", ["smtp", "to"], true],
-  ["MAIL_FROM_NAME", ["mail", "fromName"]],
-  ["MAIL_SUBJECT_PREFIX", ["mail", "subjectPrefix"]],
   ["POEM_ENABLED", ["poem", "enabled"]],
   ["POEM_RETRY_MINUTES", ["poem", "retryMinutes"]],
   ["RETURN_LIKES_ENABLED", ["likes", "enabled"]],
