@@ -1,0 +1,10 @@
+---
+import ControlLayout from '../layouts/ControlLayout.astro';
+import Logs from '../components/Logs.astro';
+import { controlApi } from '../control-api.js';
+const [overview, logs] = await Promise.all([
+  controlApi(Astro.request, '/api/overview'),
+  controlApi(Astro.request, '/api/logs?limit=100'),
+]);
+---
+<ControlLayout overview={overview}><Logs logs={logs?.logs ?? null} /></ControlLayout>

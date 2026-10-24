@@ -3,7 +3,11 @@ import '@fontsource-variable/inter';
 import '@fontsource/space-mono/400.css';
 import '@fontsource/space-mono/700.css';
 import 'perfect-scrollbar/css/perfect-scrollbar.css';
+import { ClientRouter } from 'astro:transitions';
 import '../styles/control.css';
+const { overview } = Astro.props;
+const { pathname } = Astro.url;
+const active = (href) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
 ---
 <!doctype html>
 <html lang="en">
@@ -11,18 +15,20 @@ import '../styles/control.css';
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>RNGdle Control</title>
-    <link rel="icon" href="https://www.rngdle.com/favicon/web-app-manifest-192x192.png" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <ClientRouter />
   </head>
   <body>
     <header class="topbar">
-      <a id="brand-link" class="brand" href="https://www.rngdle.com" target="_blank" rel="noopener noreferrer"><img src="https://www.rngdle.com/favicon/web-app-manifest-192x192.png" alt="" /><span>RNGdle</span><span class="brand-context">Control</span></a>
-      <nav class="tabs" role="tablist" aria-label="Control views">
-        <button class="tab active" role="tab" aria-selected="true" data-view="overview">Overview</button>
-        <button class="tab" role="tab" aria-selected="false" data-view="logs">Logs</button>
-        <button class="tab" role="tab" aria-selected="false" data-view="auth">Authentication</button>
+      <a id="brand-link" class="brand" href="https://www.rngdle.com" target="_blank" rel="noopener noreferrer"><img src="/favicon.png" alt="" width="24" height="24" /><span>RNGdle</span><span class="brand-context">Control</span></a>
+      <nav class="tabs" aria-label="Control views">
+        <a class="tab" href="/" aria-current={active('/') ? 'page' : undefined}>Overview</a>
+        <a class="tab" href="/logs" aria-current={active('/logs') ? 'page' : undefined}>Logs</a>
+        <a class="tab" href="/auth" aria-current={active('/auth') ? 'page' : undefined}>Authentication</a>
       </nav>
-      <div class="header-state"><span id="header-dot" class="dot"></span><span id="header-status">Connecting</span><button id="logout-button" class="header-action" type="button">Sign out</button></div>
+      <div class="header-state"><span id="header-dot" class={overview ? `dot ${overview.status.state}` : 'dot'}></span><span id="header-status">{overview?.status?.label ?? 'Connecting'}</span><button id="logout-button" class="header-action" type="button">Sign out</button></div>
     </header>
     <div id="main-scroll" class="main-scroll" tabindex="0"><main><slot /></main></div>
   </body>
 </html>
+<script>import '../client/control.js';</script>

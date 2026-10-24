@@ -1,8 +1,21 @@
-<section id="view-logs" class="view" role="tabpanel" hidden>
+---
+const { logs } = Astro.props;
+const dateTime = (value) => new Date(value).toLocaleString('en-US', { timeZone: 'UTC' }) + ' UTC';
+---
+<section id="view-logs" class="view">
       <h1 class="view-title">Logs</h1><p class="view-kicker">Recent automation activity</p>
       <div class="toolbar">
         <div class="toolbar-group"><select id="log-level" class="select" aria-label="Log level"><option value="all">All levels</option><option value="info">Info</option><option value="error">Errors</option></select><label class="check"><input id="log-auto" type="checkbox" checked>Auto refresh</label></div>
         <button id="log-refresh" class="button quiet" type="button">Refresh</button>
       </div>
-      <div id="log-panel" class="log-panel" tabindex="0" aria-live="polite"><div class="log-empty">Loading logs</div></div>
+      <div id="log-panel" class="log-panel" tabindex="0" aria-live="polite">
+        {logs?.length ? logs.map((entry) => (
+          <div class="log-row">
+            <time class="log-time">{dateTime(entry.timestamp)}</time>
+            <span class={`log-level ${entry.level}`}>{entry.level}</span>
+            <span class="log-message">{entry.message}</span>
+            {entry.fields && Object.keys(entry.fields).length > 0 && <pre class="log-fields">{JSON.stringify(entry.fields, null, 2)}</pre>}
+          </div>
+        )) : <div class="log-empty">{logs ? 'No matching logs' : 'Loading logs'}</div>}
+      </div>
     </section>

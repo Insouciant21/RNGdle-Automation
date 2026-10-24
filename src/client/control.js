@@ -2,11 +2,11 @@ import PerfectScrollbar from 'perfect-scrollbar';
 
     const byId = (id) => document.getElementById(id);
     const createScrollbar = (element, options) => new PerfectScrollbar(element, options);
-    const mainScrollbar = createScrollbar(byId('main-scroll'), { suppressScrollX:true, wheelPropagation:false });
-    const logScrollbar = createScrollbar(byId('log-panel'), { suppressScrollX:true, wheelPropagation:false });
-    let activeView = 'overview';
+    let mainScrollbar = null;
+    let logScrollbar = null;
     let mailRecipients = [];
     let csrfToken = null;
+    let pollTimer = null;
 
     async function request(url, options) {
       const method=(options?.method||'GET').toUpperCase();
@@ -19,15 +19,21 @@ import PerfectScrollbar from 'perfect-scrollbar';
       return data;
     }
 
-    function text(id, value, fallback = '-') { byId(id).textContent = value === null || value === undefined || value === '' ? fallback : String(value); }
+    // Views are separate routes now: every helper tolerates the elements of
+    // the other pages being absent from the current document.
+    function text(id, value, fallback = '-') { const element = byId(id); if (element) element.textContent = value === null || value === undefined || value === '' ? fallback : String(value); }
+    function setClass(id, className) { const element = byId(id); if (element) element.className = className; }
+    function setHidden(id, hidden) { const element = byId(id); if (element) element.hidden = hidden; }
+    function setHref(id, value) { const element = byId(id); if (element && value) element.href = value; }
     function number(value) { return value === null || value === undefined ? '-' : Number(value).toLocaleString('en-US'); }
     function dateTime(value) { return value ? new Date(value).toLocaleString() : '-'; }
     const rarityLabels = { trash:'Trash', common:'Common', uncommon:'Uncommon', rare:'Rare', epic:'Epic', anomaly:'Anomaly', mythic:'Mythic', unknown:'Rarity unavailable' };
     const rarityIcons = { trash:'🟫', common:'⬜', uncommon:'🟩', rare:'🟦', epic:'🟪', anomaly:'🟧', mythic:'🟥', unknown:'?' };
     const badgeRarityFromScore = (score) => { const value=Number(score); if (!Number.isFinite(value)||value<0) return 'unknown'; if(value<1000)return 'common'; if(value<10000)return 'uncommon'; if(value<100000)return 'rare'; if(value<1000000)return 'epic'; if(value<10000000)return 'anomaly'; return 'mythic'; };
     function renderBadges(result) {
-      const list=byId('badge-list'); const badges=Array.isArray(result.badges)?result.badges:[];
-      byId('badge-count-label').textContent=badges.length+' badge'+(badges.length===1?'':'s');
+      const list=byId('badge-list'); if (!list) return;
+      const badges=Array.isArray(result.badges)?result.badges:[];
+      text('badge-count-label', badges.length+' badge'+(badges.length===1?'':'s'));
       list.replaceChildren();
       if (!badges.length) { const empty=document.createElement('div'); empty.className='badge-empty'; empty.textContent='No badges earned'; list.append(empty); return; }
       badges.forEach((badge)=>{
@@ -43,32 +49,23 @@ import PerfectScrollbar from 'perfect-scrollbar';
       });
     }
 
-    function showView(name) {
-      activeView = name;
-      document.querySelectorAll('.view').forEach((view) => { view.hidden = view.id !== 'view-' + name; });
-      document.querySelectorAll('.tab').forEach((tab) => { const selected = tab.dataset.view === name; tab.classList.toggle('active', selected); tab.setAttribute('aria-selected', String(selected)); });
-      if (name === 'logs') loadLogs();
-      byId('main-scroll').scrollTop=0;
-      requestAnimationFrame(()=>mainScrollbar.update());
-    }
-
     async function refreshOverview() {
       try {
         const data = await request('/api/overview');
         const state = data.status.state;
         text('status', data.status.label);
         text('header-status', data.status.label);
-        byId('header-dot').className = 'dot ' + state;
+        setClass('header-dot', 'dot ' + state);
         text('state-tag', state);
-        byId('state-tag').className = 'tag ' + state;
+        setClass('state-tag', 'tag ' + state);
         text('schedule-meta', data.schedule.time + ' ' + data.schedule.timezone);
         text('poem-enabled', data.schedule.poemEnabled ? 'Enabled' : 'Disabled');
-        byId('poem-section').hidden = !data.result?.poem;
+        setHidden('poem-section', !data.result?.poem);
         text('poem-text', data.result?.poem);
         text('rngdle-account', data.rngdle.email);
-        byId('rngdle-link').href = data.rngdle.baseUrl;
-        byId('brand-link').href = data.rngdle.baseUrl;
-        byId('auth-submit').disabled = state !== 'waiting';
+        setHref('rngdle-link', data.rngdle.baseUrl);
+        setHref('brand-link', data.rngdle.baseUrl);
+        const submit = byId('auth-submit'); if (submit) submit.disabled = state !== 'waiting';
         mailRecipients = data.mail.to;
         text('mail-recipients', mailRecipients.join(', '));
         if (data.result) {
@@ -78,8 +75,8 @@ import PerfectScrollbar from 'perfect-scrollbar';
           text('total-ep', number(data.result.totalEp));
           text('badge-count', Array.isArray(data.result.badges) ? data.result.badges.length : data.result.badges);
           const rarity=data.result.rarity && rarityLabels[data.result.rarity] ? data.result.rarity : 'unknown';
-          byId('roll-number').className='roll-number rarity-'+rarity;
-          byId('roll-rarity').className='roll-rarity rarity-'+rarity;
+          setClass('roll-number','roll-number rarity-'+rarity);
+          setClass('roll-rarity','roll-rarity rarity-'+rarity);
           text('roll-rarity-icon',rarityIcons[rarity]); text('roll-rarity-label',rarityLabels[rarity]);
           renderBadges(data.result);
         }
@@ -93,22 +90,23 @@ import PerfectScrollbar from 'perfect-scrollbar';
           text('next-poem-retry', dateTime(data.latest.nextPoemRetryAt));
           text('next-email-retry', dateTime(data.latest.nextEmailRetryAt));
           text('mail-state', data.latest.emailSent ? 'Sent' : 'Pending');
-          byId('error-section').hidden = !data.latest.lastError;
+          setHidden('error-section', !data.latest.lastError);
           text('last-error', data.latest.lastError);
         }
-        mainScrollbar.update();
+        mainScrollbar?.update();
       } catch (error) {
         text('status', 'Unavailable'); text('header-status', 'Offline');
-        byId('header-dot').className = 'dot error';
+        setClass('header-dot', 'dot error');
       }
     }
 
     async function loadLogs() {
       const panel = byId('log-panel');
+      if (!panel) return;
       try {
         const data = await request('/api/logs?limit=200&level=' + encodeURIComponent(byId('log-level').value));
         panel.replaceChildren();
-        if (!data.logs.length) { const empty=document.createElement('div'); empty.className='log-empty'; empty.textContent='No matching logs'; panel.append(empty); logScrollbar.update(); return; }
+        if (!data.logs.length) { const empty=document.createElement('div'); empty.className='log-empty'; empty.textContent='No matching logs'; panel.append(empty); logScrollbar?.update(); return; }
         data.logs.forEach((entry) => {
           const row=document.createElement('div'); row.className='log-row';
           const time=document.createElement('time'); time.className='log-time'; time.textContent=new Date(entry.timestamp).toLocaleString();
@@ -118,15 +116,24 @@ import PerfectScrollbar from 'perfect-scrollbar';
           if (entry.fields && Object.keys(entry.fields).length) { const fields=document.createElement('pre'); fields.className='log-fields'; fields.textContent=JSON.stringify(entry.fields,null,2); row.append(fields); }
           panel.append(row);
         });
-        logScrollbar.update(); panel.scrollTop=panel.scrollHeight; logScrollbar.update();
+        logScrollbar?.update(); panel.scrollTop=panel.scrollHeight; logScrollbar?.update();
       } catch (error) { panel.textContent=error.message; }
     }
 
-    document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click',()=>showView(tab.dataset.view)));
-    byId('auth-form').addEventListener('submit',async(event)=>{ event.preventDefault(); const message=byId('auth-message'); message.className='feedback'; message.textContent=''; byId('auth-submit').disabled=true; try { const data=await request('/api/auth-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({link:byId('auth-link').value})}); message.textContent=data.message; byId('auth-link').value=''; } catch(error) { message.className='feedback error'; message.textContent=error.message; } await refreshOverview(); });
-    byId('log-refresh').addEventListener('click',loadLogs); byId('log-level').addEventListener('change',loadLogs);
-    byId('email-send').addEventListener('click',async()=>{ const recipients=mailRecipients.length ? mailRecipients.join(', ') : 'the configured recipients'; if(!window.confirm('Send the result email to '+recipients+'?')) return; const button=byId('email-send'); const message=byId('email-message'); button.disabled=true; button.textContent='Sending'; message.className='feedback email-feedback'; message.textContent=''; try { const data=await request('/api/email/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'result'})}); message.textContent=data.message; } catch(error) { message.className='feedback email-feedback error'; message.textContent=error.message; } finally { button.disabled=false; button.textContent='Send email'; } });
-    byId('logout-button').addEventListener('click',async()=>{ try { await request('/api/auth/logout',{method:'POST'}); } finally { window.location.href='/login'; } });
-    window.addEventListener('resize',()=>{ mainScrollbar.update(); logScrollbar.update(); });
-    setInterval(()=>{ refreshOverview(); if(activeView==='logs'&&byId('log-auto').checked) loadLogs(); },3000);
-    (async()=>{ try { const session=await request('/api/auth/session'); if (!session.authenticated) { window.location.href='/login'; return; } csrfToken=session.csrfToken; await refreshOverview(); } catch (_) {} })();
+    function setup() {
+      if (pollTimer) clearInterval(pollTimer);
+      mainScrollbar = byId('main-scroll') ? createScrollbar(byId('main-scroll'), { suppressScrollX:true, wheelPropagation:false }) : null;
+      logScrollbar = byId('log-panel') ? createScrollbar(byId('log-panel'), { suppressScrollX:true, wheelPropagation:false }) : null;
+      byId('auth-form')?.addEventListener('submit',async(event)=>{ event.preventDefault(); const message=byId('auth-message'); message.className='feedback'; message.textContent=''; byId('auth-submit').disabled=true; try { const data=await request('/api/auth-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({link:byId('auth-link').value})}); message.textContent=data.message; byId('auth-link').value=''; } catch(error) { message.className='feedback error'; message.textContent=error.message; } await refreshOverview(); });
+      byId('log-refresh')?.addEventListener('click',loadLogs); byId('log-level')?.addEventListener('change',loadLogs);
+      byId('email-send')?.addEventListener('click',async()=>{ const recipients=mailRecipients.length ? mailRecipients.join(', ') : 'the configured recipients'; if(!window.confirm('Send the result email to '+recipients+'?')) return; const button=byId('email-send'); const message=byId('email-message'); button.disabled=true; button.textContent='Sending'; message.className='feedback email-feedback'; message.textContent=''; try { const data=await request('/api/email/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'result'})}); message.textContent=data.message; } catch(error) { message.className='feedback email-feedback error'; message.textContent=error.message; } finally { button.disabled=false; button.textContent='Send email'; } });
+      byId('logout-button')?.addEventListener('click',async()=>{ try { await request('/api/auth/logout',{method:'POST'}); } finally { window.location.href='/login'; } });
+      loadLogs();
+      refreshOverview();
+      (async()=>{ try { const session=await request('/api/auth/session'); if (!session.authenticated) { window.location.href='/login'; return; } csrfToken=session.csrfToken; } catch (_) {} })();
+      pollTimer = setInterval(()=>{ refreshOverview(); if (byId('log-auto')?.checked) loadLogs(); },3000);
+    }
+
+    window.addEventListener('resize',()=>{ mainScrollbar?.update(); logScrollbar?.update(); });
+    // Fires on the initial load and after every ClientRouter navigation.
+    document.addEventListener('astro:page-load', setup);

@@ -11,5 +11,5 @@ export default defineConfig({
   testDir: "test/e2e",
   workers: 1,
   use: { baseURL: "http://localhost:4322", browserName: "chromium", launchOptions: chromium ? { executablePath: chromium } : {} },
-  webServer: { command: "pnpm build && node scripts/preview-test.mjs", url: "http://localhost:4322/api/status", timeout: 60000 },
+  webServer: { command: "pnpm build && node scripts/preview-test.mjs", url: "http://localhost:4322/api/status", timeout: 60000, reuseExistingServer: false },
 });

@@ -1,17 +1,18 @@
 ---
+export const prerender = true;
 import AuthLayout from '../layouts/AuthLayout.astro';
-const configured = Astro.locals.session?.configured;
 ---
 <AuthLayout title="RNGdle Control sign in">
 <main class="login">
     <h1>RNGdle Control</h1>
     <p>Private operations console</p>
-    {configured ? <form id="login-form">
+    <form id="login-form">
       <label for="password">Control password</label>
       <input id="password" type="password" autocomplete="current-password" required autofocus>
       <button id="submit" type="submit">Sign in</button>
       <div id="feedback" class="feedback" role="alert"></div>
-    </form> : <p class="note">Set the CONTROL_PASSWORD Worker secret to enable sign in.</p>}
+    </form>
+    <p class="note" id="setup-note" hidden>Set the CONTROL_PASSWORD Worker secret to enable sign in.</p>
   </main>
 </AuthLayout>
 <script>import '../client/login.js';</script>

@@ -1,12 +1,16 @@
-<section id="view-auth" class="view" role="tabpanel" hidden>
+---
+const { overview } = Astro.props;
+const account = overview?.rngdle ?? null;
+---
+<section id="view-auth" class="view">
       <h1 class="view-title">Authentication</h1><p class="view-kicker">Persistent HTTP session</p>
       <div class="auth-page">
         <section class="section">
           <div class="section-heading"><h2>RNGdle account</h2><span class="section-meta">Magic link</span></div>
           <div class="panel">
-            <div class="detail-row"><span class="detail-label">Account</span><strong id="rngdle-account" class="detail-value">Loading</strong></div>
+            <div class="detail-row"><span class="detail-label">Account</span><strong id="rngdle-account" class="detail-value">{account?.email ?? 'Loading'}</strong></div>
             <div class="auth-actions">
-              <a id="rngdle-link" class="button block" href="https://www.rngdle.com" target="_blank" rel="noopener noreferrer">Request sign-in link</a>
+              <a id="rngdle-link" class="button block" href={account?.baseUrl ?? 'https://www.rngdle.com'} target="_blank" rel="noopener noreferrer">Request sign-in link</a>
               <form id="auth-form">
                 <label class="field-label" for="auth-link">Email magic-link URL</label>
                 <input class="input" id="auth-link" type="url" inputmode="url" autocomplete="off" placeholder="https://www.rngdle.com/..." required>

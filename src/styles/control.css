@@ -16,9 +16,9 @@
     .dot.waiting,.dot.error { background:var(--danger); }
     .dot.authenticated,.dot.idle,.dot.success { background:var(--success); }
     .tabs { grid-column:2; display:flex; align-self:stretch; justify-content:center; min-width:0; }
-    .tab { min-width:96px; min-height:49px; padding:10px 14px; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--prose-3); font:700 11px/1.2 var(--font-sans); letter-spacing:.08em; text-transform:uppercase; cursor:pointer; }
+    .tab { display:inline-flex; align-items:center; justify-content:center; min-width:96px; min-height:49px; padding:10px 14px; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--prose-3); font:700 11px/1.2 var(--font-sans); letter-spacing:.08em; text-transform:uppercase; text-decoration:none; cursor:pointer; }
     .tab:hover { color:var(--prose); background:var(--raised); }
-    .tab.active { border-bottom-color:var(--prose); color:var(--prose); }
+    .tab.active,.tab[aria-current="page"] { border-bottom-color:var(--prose); color:var(--prose); }
     .main-scroll { position:relative; flex:1 1 auto; min-height:0; overflow:auto; }
     main { width:100%; max-width:1040px; margin:0 auto; padding:36px 20px 56px; }
     .view[hidden] { display:none; }

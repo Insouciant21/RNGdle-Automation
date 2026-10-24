@@ -9,7 +9,7 @@ test.beforeAll(async ({ request }) => {
   expect(response.status()).toBe(200);
 });
 
-test("Workers runtime serves authenticated Astro views without a settings page", async ({ page }) => {
+test("Astro serves SSR data on routed views with transitions and no settings page", async ({ page }) => {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
@@ -19,18 +19,27 @@ test("Workers runtime serves authenticated Astro views without a settings page",
   await expect(page.locator("#roll-number")).toHaveText("123456");
   await expect(page.locator("#poem-text")).toHaveText("mountains rise");
   await expect(page.locator("#schedule-meta")).toHaveText("00:00 UTC");
-  await page.getByRole("tab", { name: "Logs", exact: true }).click();
+  const html = await (await page.context().request.get("/")).text();
+  expect(html).toContain("123456");
+  expect(html).toContain("mountains rise");
+  await page.getByRole("link", { name: "Logs", exact: true }).click();
+  await expect(page).toHaveURL(/\/logs$/);
   await expect(page.locator("#log-panel")).toContainText("Backup imported");
-  await page.getByRole("tab", { name: "Authentication", exact: true }).click();
+  const logsHtml = await (await page.context().request.get("/logs")).text();
+  expect(logsHtml).toContain("Backup imported");
+  await page.getByRole("link", { name: "Authentication", exact: true }).click();
+  await expect(page).toHaveURL(/\/auth$/);
   await expect(page.locator("#rngdle-account")).toHaveText("player@example.com");
-  await expect(page.getByRole("tab", { name: "Settings", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Settings", exact: true })).toHaveCount(0);
+  await page.goBack();
+  await expect(page.locator("#log-panel")).toContainText("Backup imported");
   const preview = await page.context().request.get("/preview/email");
   expect(preview.status()).toBe(200);
   expect(await preview.text()).toContain("123456");
   expect(preview.headers()["content-security-policy"]).toContain("default-src 'none'");
+  await page.goto("/");
   await page.screenshot({ path: "test-results/control-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("tab", { name: "Overview", exact: true }).click();
   await expect(page.locator("#roll-number")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: "test-results/control-mobile.png" });
