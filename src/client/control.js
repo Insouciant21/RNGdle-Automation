@@ -28,7 +28,7 @@ import PerfectScrollbar from 'perfect-scrollbar';
     function number(value) { return value === null || value === undefined ? '-' : Number(value).toLocaleString('en-US'); }
     function dateTime(value) { return value ? new Date(value).toLocaleString() : '-'; }
     const rarityLabels = { trash:'Trash', common:'Common', uncommon:'Uncommon', rare:'Rare', epic:'Epic', anomaly:'Anomaly', mythic:'Mythic', unknown:'Rarity unavailable' };
-    const rarityIcons = { trash:'🟫', common:'⬜', uncommon:'🟩', rare:'🟦', epic:'🟪', anomaly:'🟧', mythic:'🟥', unknown:'?' };
+    const rarityIcons = { trash:'●', common:'●', uncommon:'●', rare:'●', epic:'●', anomaly:'●', mythic:'●', unknown:'●' };
     const badgeRarityFromScore = (score) => { const value=Number(score); if (!Number.isFinite(value)||value<0) return 'unknown'; if(value<1000)return 'common'; if(value<10000)return 'uncommon'; if(value<100000)return 'rare'; if(value<1000000)return 'epic'; if(value<10000000)return 'anomaly'; return 'mythic'; };
     function renderBadges(result) {
       const list=byId('badge-list'); if (!list) return;
@@ -56,7 +56,6 @@ import PerfectScrollbar from 'perfect-scrollbar';
         text('status', data.status.label);
         text('header-status', data.status.label);
         setClass('header-dot', 'dot ' + state);
-        text('state-tag', state);
         setClass('state-tag', 'tag ' + state);
         text('schedule-meta', data.schedule.time + ' ' + data.schedule.timezone);
         text('poem-enabled', data.schedule.poemEnabled ? 'Enabled' : 'Disabled');

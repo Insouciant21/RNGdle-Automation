@@ -7,7 +7,6 @@ const latest = overview?.latest ?? null;
 const mail = overview?.mail ?? null;
 const rarityKeys = ['trash','common','uncommon','rare','epic','anomaly','mythic'];
 const rarityLabels = { trash:'Trash', common:'Common', uncommon:'Uncommon', rare:'Rare', epic:'Epic', anomaly:'Anomaly', mythic:'Mythic', unknown:'Rarity unavailable' };
-const rarityIcons = { trash:'🟫', common:'⬜', uncommon:'🟩', rare:'🟦', epic:'🟪', anomaly:'🟧', mythic:'🟥', unknown:'?' };
 const rarity = result && rarityKeys.includes(result.rarity) ? result.rarity : 'unknown';
 const badges = Array.isArray(result?.badges) ? result.badges : null;
 const count = (value) => value === null || value === undefined ? '-' : Number(value).toLocaleString('en-US');
@@ -17,22 +16,24 @@ const badgeRarity = (badge) => rarityKeys.includes(badge.rarity) ? badge.rarity 
 ---
 <section id="view-overview" class="view">
       <div class="status-hero">
-        <div class="status-frame"><strong id="status" class="status-copy" aria-live="polite">{status?.label ?? 'Loading'}</strong></div>
-        <div class="meta"><span id="state-tag" class={`tag ${status?.state ?? 'connecting'}`}>{status?.state ?? 'Connecting'}</span><span aria-hidden="true">•</span><span id="schedule-meta">{schedule ? `${schedule.time} ${schedule.timezone}` : 'Loading schedule'}</span></div>
+        <div class="status-row">
+          <span class="status-chip"><span id="state-tag" class={`tag ${status?.state ?? 'connecting'}`} aria-hidden="true"></span><strong id="status" class="status-copy" aria-live="polite">{status?.label ?? 'Loading'}</strong></span>
+          <span class="meta"><span id="schedule-meta">{schedule ? `${schedule.time} ${schedule.timezone}` : 'Loading schedule'}</span></span>
+        </div>
       </div>
       <div class="overview-grid">
         <div>
           <section class="section">
             <div class="section-heading"><h2>Latest roll</h2><span id="result-date" class="section-meta">{result?.date ?? 'No result'}</span></div>
             <div class="panel">
-              <div class="result-summary"><span id="roll-number" class={`roll-number rarity-${rarity}`}>{result ? result.number : '------'}</span><div id="roll-rarity" class={`roll-rarity rarity-${rarity}`}><span id="roll-rarity-icon">{rarityIcons[rarity]}</span><span id="roll-rarity-label">{rarityLabels[rarity]}</span></div></div>
+              <div class="result-summary"><span id="roll-number" class={`roll-number rarity-${rarity}`}>{result ? result.number : '------'}</span><div id="roll-rarity" class={`roll-rarity rarity-${rarity}`}><span id="roll-rarity-icon" class="roll-rarity-icon">●</span><span id="roll-rarity-label">{rarityLabels[rarity]}</span></div></div>
               <div class="stats">
-                <div class="stat"><span id="earned-ep" class="stat-value">{result ? count(result.earnedEp) : '-'}</span><span class="stat-label">Earned EP</span></div>
-                <div class="stat"><span id="total-ep" class="stat-value">{result ? count(result.totalEp) : '-'}</span><span class="stat-label">Lifetime EP</span></div>
+                <div class="stat stat-ep"><span id="earned-ep" class="stat-value">{result ? count(result.earnedEp) : '-'}</span><span class="stat-label">Earned EP</span></div>
+                <div class="stat stat-ep"><span id="total-ep" class="stat-value">{result ? count(result.totalEp) : '-'}</span><span class="stat-label">Lifetime EP</span></div>
                 <div class="stat"><span id="badge-count" class="stat-value">{result ? (badges ? badges.length : result.badges) : '-'}</span><span class="stat-label">Badges</span></div>
-                <div class="stat"><span id="mail-state" class="stat-value">{latest ? (latest.emailSent ? 'Sent' : 'Pending') : '-'}</span><span class="stat-label">Email</span></div>
+                <div class="stat stat-mail"><span id="mail-state" class="stat-value">{latest ? (latest.emailSent ? 'Sent' : 'Pending') : '-'}</span><span class="stat-label">Email</span></div>
               </div>
-              <div id="poem-section" class="badge-breakdown" hidden={!result?.poem}><div class="badge-breakdown-heading"><span>Poem</span></div><p id="poem-text">{result?.poem}</p></div>
+              <div id="poem-section" class="poem-block" hidden={!result?.poem}><strong class="section-meta">Poem</strong><p id="poem-text">{result?.poem}</p></div>
               <div class="badge-breakdown"><div class="badge-breakdown-heading"><span>Badge breakdown</span><span id="badge-count-label" class="section-meta">{badges ? `${badges.length} badge${badges.length === 1 ? '' : 's'}` : '-'}</span></div><div id="badge-list" class="badge-list">
                 {badges?.length ? badges.map((badge) => (
                   <div class={`badge-item rarity-${badgeRarity(badge)}`}>
