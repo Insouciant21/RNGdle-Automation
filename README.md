@@ -19,18 +19,23 @@ Astro 控制台与 Cloudflare Workers 每日自动化服务。每天在 UTC `00:
 
 ## 本地开发
 
-需要 Node.js 22.12+ 和 pnpm 11：
+使用 [mise](https://mise.jdx.dev/getting-started.html) 管理 Node.js 和 pnpm，并提供开发、测试、构建及部署任务。Node.js 版本固定在 `mise.toml`，pnpm 版本读取 `package.json` 的 `packageManager`，本地无需启用 Corepack。
 
 ```bash
-pnpm install
-pnpm test
-pnpm test:e2e
-pnpm build
+mise trust
+mise install
+mise run install
+mise run test
+mise run build
 ```
 
-浏览器测试使用独立 workerd 与临时 SQLite 存储，不访问真实 SMTP、LLM 或 RNGdle 账号。若未安装 Chromium，先运行 `pnpm exec playwright install chromium`。
+`mise tasks` 可查看所有命令；`mise run test:e2e` 运行浏览器测试，`mise run check` 同时运行单元和浏览器测试。开发、测试、构建及部署任务会先安装锁文件中的依赖。
 
-如需本地连接真实服务，将 `.dev.vars.example` 复制为 `.dev.vars` 并填写账号及凭证，然后运行 `pnpm dev`。本地也使用 workerd 与 Durable Object；`.dev.vars`、`data/`、`backups/` 均已被忽略。
+浏览器测试使用独立 workerd 与临时 SQLite 存储，不访问真实 SMTP、LLM 或 RNGdle 账号。若未安装 Chromium，先运行 `mise run browsers:install`。
+
+浏览器测试还需要 Chromium 的系统运行库；Debian/Ubuntu 可用 `mise run browsers:install --with-deps` 一并安装。
+
+如需本地连接真实服务，将 `.dev.vars.example` 复制为 `.dev.vars` 并填写账号及凭证，然后运行 `mise run dev`。本地也使用 workerd 与 Durable Object；`.dev.vars`、`data/`、`backups/` 均已被忽略。
 
 ## 运行行为
 
@@ -48,10 +53,10 @@ pnpm build
 管理工具通过 `/__migration/*` 和独立 Bearer Token 访问。Token 保存在被忽略的 `data/cloudflare-migration.json`，可用 `MIGRATION_CREDENTIALS` 指定其他路径，`MIGRATION_ORIGIN` 临时覆盖目标地址。
 
 ```bash
-pnpm cloudflare status
-pnpm cloudflare pause
-pnpm cloudflare resume
-pnpm cloudflare backup backups/workers.json
+mise run cloudflare status
+mise run cloudflare pause
+mise run cloudflare resume
+mise run cloudflare backup backups/workers.json
 ```
 
 备份包含配置、Cookie、每日状态和回赞去重记录。恢复时先向空 Worker 导入，再验证并启用调度；登录密码沿用目标 Worker 的 `CONTROL_PASSWORD` Secret。旧版备份仍可导入，其中的 Control 密码哈希不会恢复。
@@ -80,10 +85,12 @@ pnpm cloudflare backup backups/workers.json
 
 `SMTP_AUTH_MODE=oauth2` 时改用 `SMTP_OAUTH_*` 四项，无需 `SMTP_PASSWORD`。
 
-可见覆盖值通过 Workers Builds 变量或 Wrangler 配置提供，凭证用 `pnpm exec wrangler secret put <NAME>`。`pnpm cloudflare:init <url>` 从 `.dev.vars` 和 Workers 变量生成本地配置文件；`pnpm cloudflare secrets` 上传其中的凭证，也可指定 Workers 备份文件。
+可见覆盖值通过 Workers Builds 变量或 Wrangler 配置提供，凭证用 `mise run wrangler secret put <NAME>`。`mise run cloudflare init <url>` 从 `.dev.vars` 和 Workers 变量生成本地配置文件；`mise run cloudflare secrets` 上传其中的凭证，也可指定 Workers 备份文件。
 
-`pnpm deploy:workers` 按 Workers Builds 变量构建并部署。使用本地专属配置时，`pnpm deploy:production` 会合并被忽略的 `wrangler.production.jsonc` 与 `data/cloudflare-secrets.json` 中的非敏感覆盖值，再按同一份配置构建并部署；可加 `--dry-run` 仅验证构建与打包。修改变量后需重新部署生效。
+`mise run deploy` 按 Workers Builds 变量构建并部署。使用本地专属配置时，`mise run deploy:production` 会合并被忽略的 `wrangler.production.jsonc` 与 `data/cloudflare-secrets.json` 中的非敏感覆盖值，再按同一份配置构建并部署；可加 `--dry-run` 仅验证构建与打包。修改变量后需重新部署生效。
 
-生产 `CONTROL_PUBLIC_URL` 固定为 Wrangler 配置中的 HTTPS 地址，备份中的 URL 不会覆盖它。Control 密码由 `CONTROL_PASSWORD` Secret 管理，可在 Cloudflare 控制台修改，或运行 `pnpm exec wrangler secret put CONTROL_PASSWORD`。Durable Object 只保存会话和登录限流记录，修改密码后旧会话失效。Cookie 始终启用 Secure；运行配置从 Worker 绑定读取，本地通过 `.dev.vars` 提供。
+Cloudflare Workers Builds 的构建命令设为 `sh scripts/workers-mise.sh`，部署命令设为 `sh scripts/workers-mise.sh wrangler deploy`，并添加构建变量 `SKIP_DEPENDENCY_INSTALL=1`。启动脚本自动安装固定版本的 mise，再按仓库中的版本配置安装 Node.js、pnpm 与项目依赖；本地和云端共用 `build:workers` 任务。无需配置 `NODE_VERSION` 或 `PNPM_VERSION`。`pnpm build:workers` 和 `pnpm deploy:workers` 也会通过同一启动脚本执行。
+
+生产 `CONTROL_PUBLIC_URL` 固定为 Wrangler 配置中的 HTTPS 地址，备份中的 URL 不会覆盖它。Control 密码由 `CONTROL_PASSWORD` Secret 管理，可在 Cloudflare 控制台修改，或运行 `mise run wrangler secret put CONTROL_PASSWORD`。Durable Object 只保存会话和登录限流记录，修改密码后旧会话失效。Cookie 始终启用 Secure；运行配置从 Worker 绑定读取，本地通过 `.dev.vars` 提供。
 
 技术依据：[Astro Cloudflare 适配器](https://docs.astro.build/en/guides/integrations-guide/cloudflare/)、[Durable Object Alarms](https://developers.cloudflare.com/durable-objects/api/alarms/)、[Workers TCP sockets](https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/)。

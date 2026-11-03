@@ -1,0 +1,77 @@
+[tools]
+node = "26.12.1"
+
+[settings]
+# Read the pinned pnpm version from package.json, also used by Workers Builds.
+idiomatic_version_file_enable_tools = ["pnpm"]
+
+[tasks.install]
+description = "Install dependencies from the lockfile"
+run = "pnpm install --frozen-lockfile"
+
+[tasks.dev]
+description = "Start the Astro development server"
+depends = ["install"]
+run = "pnpm run dev"
+raw = true
+
+[tasks.build]
+description = "Build the Astro Worker"
+depends = ["install"]
+run = "pnpm run build"
+
+[tasks.preview]
+description = "Build and preview the Astro Worker"
+depends = ["build"]
+run = "pnpm run preview"
+raw = true
+
+[tasks.test]
+description = "Run unit tests"
+depends = ["install"]
+run = "pnpm run test"
+
+[tasks."test:e2e"]
+description = "Run browser tests in an isolated Worker"
+depends = ["install"]
+run = "pnpm run test:e2e"
+
+[tasks.check]
+description = "Run unit and browser tests"
+depends = ["test", "test:e2e"]
+
+[tasks."browsers:install"]
+description = "Install Chromium for browser tests"
+depends = ["install"]
+run = "pnpm exec playwright install chromium"
+
+[tasks."build:workers"]
+description = "Build with Workers Builds variables"
+depends = ["install"]
+run = [
+  "node scripts/prepare-workers-build.mjs",
+  "CLOUDFLARE_WRANGLER_CONFIG=wrangler.workers-build.jsonc pnpm run build",
+]
+
+[tasks.deploy]
+description = "Build and deploy with Workers Builds variables"
+depends = ["build:workers"]
+run = "pnpm run deploy"
+
+[tasks."deploy:production"]
+description = "Build and deploy with the local production configuration"
+depends = ["install"]
+run = "pnpm run deploy:production"
+raw = true
+
+[tasks.cloudflare]
+description = "Manage Worker configuration, backups and automation"
+depends = ["install"]
+run = "pnpm run cloudflare"
+raw = true
+
+[tasks.wrangler]
+description = "Run Wrangler with the project toolchain"
+depends = ["install"]
+run = "pnpm exec wrangler"
+raw = true
