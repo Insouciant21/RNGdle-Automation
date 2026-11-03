@@ -10,13 +10,13 @@
     "dev": "CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV=false astro dev",
     "build": "CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV=false astro build",
     "preview": "CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV=false astro preview",
-    "deploy": "pnpm exec wrangler deploy",
+    "deploy": "pnpm exec wrangler deploy --config dist/server/wrangler.json",
     "deploy:production": "node scripts/deploy-production.mjs",
     "test:e2e": "playwright test",
     "cloudflare": "node scripts/cloudflare.mjs",
     "cloudflare:init": "node scripts/cloudflare.mjs init",
-    "build:workers": "sh scripts/workers-mise.sh build:workers",
-    "deploy:workers": "sh scripts/workers-mise.sh deploy"
+    "build:workers": "node scripts/prepare-workers-build.mjs && CLOUDFLARE_WRANGLER_CONFIG=wrangler.workers-build.jsonc pnpm run build",
+    "deploy:workers": "pnpm run build:workers && pnpm run deploy"
   },
   "engines": {
     "node": ">=22.12.0"

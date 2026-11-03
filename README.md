@@ -19,7 +19,7 @@ Astro 控制台与 Cloudflare Workers 每日自动化服务。每天在 UTC `00:
 
 ## 本地开发
 
-使用 [mise](https://mise.jdx.dev/getting-started.html) 管理 Node.js 和 pnpm，并提供开发、测试、构建及部署任务。Node.js 版本固定在 `mise.toml`，pnpm 版本读取 `package.json` 的 `packageManager`，本地无需启用 Corepack。
+使用 [mise](https://mise.jdx.dev/getting-started.html) 管理本地 Node.js 和 pnpm，并提供开发、测试、构建及部署任务。Node.js 版本读取 `.node-version`，pnpm 版本读取 `package.json` 的 `packageManager`，本地无需启用 Corepack。
 
 ```bash
 mise trust
@@ -89,7 +89,7 @@ mise run cloudflare backup backups/workers.json
 
 `mise run deploy` 按 Workers Builds 变量构建并部署。使用本地专属配置时，`mise run deploy:production` 会合并被忽略的 `wrangler.production.jsonc` 与 `data/cloudflare-secrets.json` 中的非敏感覆盖值，再按同一份配置构建并部署；可加 `--dry-run` 仅验证构建与打包。修改变量后需重新部署生效。
 
-Cloudflare Workers Builds 的构建命令设为 `sh scripts/workers-mise.sh`，部署命令设为 `sh scripts/workers-mise.sh wrangler deploy`，并添加构建变量 `SKIP_DEPENDENCY_INSTALL=1`。启动脚本自动安装固定版本的 mise，再按仓库中的版本配置安装 Node.js、pnpm 与项目依赖；本地和云端共用 `build:workers` 任务。无需配置 `NODE_VERSION` 或 `PNPM_VERSION`。`pnpm build:workers` 和 `pnpm deploy:workers` 也会通过同一启动脚本执行。
+Cloudflare Workers Builds 的构建命令设为 `pnpm run build:workers`，部署命令设为 `pnpm run deploy`。云端使用 Cloudflare 原生工具链与自动依赖安装，Node.js 和 pnpm 版本分别读取 `.node-version` 与 `package.json` 的 `packageManager`。移除已有的 `SKIP_DEPENDENCY_INSTALL` 构建变量，无需配置 `NODE_VERSION` 或 `PNPM_VERSION`。本地可用 `mise run deploy`，或运行 `pnpm run deploy:workers` 完成构建和部署。
 
 生产 `CONTROL_PUBLIC_URL` 固定为 Wrangler 配置中的 HTTPS 地址，备份中的 URL 不会覆盖它。Control 密码由 `CONTROL_PASSWORD` Secret 管理，可在 Cloudflare 控制台修改，或运行 `mise run wrangler secret put CONTROL_PASSWORD`。Durable Object 只保存会话和登录限流记录，修改密码后旧会话失效。Cookie 始终启用 Secure；运行配置从 Worker 绑定读取，本地通过 `.dev.vars` 提供。
 

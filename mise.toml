@@ -1,9 +1,6 @@
-[tools]
-node = "26.12.1"
-
 [settings]
-# Read the pinned pnpm version from package.json, also used by Workers Builds.
-idiomatic_version_file_enable_tools = ["pnpm"]
+# Share version declarations with Workers Builds: .node-version and package.json.
+idiomatic_version_file_enable_tools = ["node", "pnpm"]
 
 [tasks.install]
 description = "Install dependencies from the lockfile"
@@ -48,10 +45,7 @@ run = "pnpm exec playwright install chromium"
 [tasks."build:workers"]
 description = "Build with Workers Builds variables"
 depends = ["install"]
-run = [
-  "node scripts/prepare-workers-build.mjs",
-  "CLOUDFLARE_WRANGLER_CONFIG=wrangler.workers-build.jsonc pnpm run build",
-]
+run = "pnpm run build:workers"
 
 [tasks.deploy]
 description = "Build and deploy with Workers Builds variables"
