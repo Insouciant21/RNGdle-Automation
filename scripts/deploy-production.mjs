@@ -20,4 +20,7 @@ function run(args, env = process.env) {
 }
 
 run(["build"], { ...process.env, CLOUDFLARE_WRANGLER_CONFIG: configPath });
-run(["exec", "wrangler", "deploy", ...process.argv.slice(2)]);
+// Astro writes the deployable entry and copies the production bindings here.
+const deployArgs = process.argv.slice(2);
+if (deployArgs[0] === "--") deployArgs.shift(); // pnpm run <script> -- <args>
+run(["exec", "wrangler", "deploy", "--config", "dist/server/wrangler.json", ...deployArgs]);

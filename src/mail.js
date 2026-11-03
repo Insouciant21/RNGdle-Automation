@@ -1,4 +1,6 @@
 import nodemailer from "nodemailer";
+import tls from "node:tls";
+import net from "node:net";
 import { badgeRarity, cardRarity, rarityLabel, rarityPalette } from "./rarity.js";
 
 // Keep the sent message attractive on clients that do not load project fonts.
@@ -15,6 +17,7 @@ function escapeHtml(value) {
 }
 
 function transport(config) {
+  const connectionTimeout = config.http?.timeoutMs ?? 45_000;
   const auth =
     config.smtp.authMode === "oauth2"
       ? {
@@ -34,9 +37,34 @@ function transport(config) {
     port: config.smtp.port,
     secure: config.smtp.secure,
     requireTLS: config.smtp.requireTls,
-    connectionTimeout: config.http?.timeoutMs ?? 45_000,
-    greetingTimeout: config.http?.timeoutMs ?? 45_000,
-    socketTimeout: config.http?.timeoutMs ?? 45_000,
+    connectionTimeout,
+    greetingTimeout: connectionTimeout,
+    socketTimeout: connectionTimeout,
+    // Nodemailer resolves SMTP hostnames to IPs before calling tls.connect().
+    // Workers rejects TLS connections to those IP literals, but accepts the
+    // hostname. Hand Nodemailer an already-secured, hostname-based socket.
+    ...(config.smtp.secure ? { getSocket(options, callback) {
+      const socket = tls.connect({
+        host: options.host,
+        port: options.port,
+        servername: net.isIP(options.host) ? undefined : options.host,
+      });
+      let settled = false;
+      const timer = setTimeout(() => {
+        socket.destroy();
+        finish(new Error("SMTP TLS connection timed out"));
+      }, connectionTimeout);
+      function finish(error, result) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        socket.off("error", onError);
+        callback(error, result);
+      }
+      function onError(error) { finish(error); }
+      socket.once("error", onError);
+      socket.once("secureConnect", () => finish(null, { connection: socket, secured: true }));
+    } } : {}),
     auth,
   });
 }

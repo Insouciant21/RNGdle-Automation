@@ -76,25 +76,32 @@ test("production deployment builds with production vars and stops before deployi
   await fs.writeFile(path.join(bin, "pnpm"), `#!/usr/bin/env node
 import fs from "node:fs";
 const args = process.argv.slice(2);
-const configPath = process.env.CLOUDFLARE_WRANGLER_CONFIG;
-const config = args[0] === "build" ? JSON.parse(fs.readFileSync(configPath, "utf8")) : null;
+const configPath = args[0] === "build" ? process.env.CLOUDFLARE_WRANGLER_CONFIG : args[0] === "exec" ? args[4] : null;
+const config = configPath ? JSON.parse(fs.readFileSync(configPath, "utf8")) : null;
 fs.appendFileSync("commands.jsonl", JSON.stringify({ args, config }) + "\\n");
 if (args[0] === "build" && process.env.FAIL_BUILD === "true") process.exit(17);
+if (args[0] === "build") {
+  fs.mkdirSync("dist/server", { recursive: true });
+  fs.writeFileSync("dist/server/wrangler.json", JSON.stringify({ ...config, main: "entry.mjs", assets: { binding: "ASSETS", directory: "../client" } }));
+}
 `, { mode: 0o755 });
   const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, SECRETS_PATH: secretsPath };
   for (const name of ["WORKER_NAME", "CONTROL_PUBLIC_URL", "CUSTOM_DOMAIN", "ZONE_NAME", "CLOUDFLARE_WRANGLER_CONFIG"]) delete env[name];
   const script = fileURLToPath(new URL("../scripts/deploy-production.mjs", import.meta.url));
-  const run = (extra = {}) => spawnSync(process.execPath, [script, "--dry-run"], { cwd: directory, env: { ...env, ...extra }, encoding: "utf8" });
+  const run = (extra = {}) => spawnSync(process.execPath, [script, "--", "--dry-run"], { cwd: directory, env: { ...env, ...extra }, encoding: "utf8" });
   const success = run();
   assert.equal(success.status, 0, success.stderr);
   const commands = (await fs.readFile(path.join(directory, "commands.jsonl"), "utf8")).trim().split("\n").map(JSON.parse);
-  assert.deepEqual(commands.map((entry) => entry.args), [["build"], ["exec", "wrangler", "deploy", "--dry-run"]]);
+  assert.deepEqual(commands.map((entry) => entry.args), [["build"], ["exec", "wrangler", "deploy", "--config", "dist/server/wrangler.json", "--dry-run"]]);
   assert.equal(commands[0].config.name, "production-worker");
   assert.equal(commands[0].config.vars.CONTROL_PUBLIC_URL, "https://control.example.com");
   assert.equal(commands[0].config.vars.CONTROL_PASSWORD, undefined);
   assert.equal(commands[0].config.vars.SMTP_PORT, "465");
   assert.equal(commands[0].config.vars.SMTP_PASSWORD, undefined);
   assert.deepEqual(commands[0].config.routes, production.routes);
+  assert.equal(commands[1].config.main, "entry.mjs");
+  assert.equal(commands[1].config.vars.SMTP_PORT, "465");
+  assert.deepEqual(commands[1].config.routes, production.routes);
 
   assert.equal(run({ FAIL_BUILD: "true" }).status, 17);
   const after = (await fs.readFile(path.join(directory, "commands.jsonl"), "utf8")).trim().split("\n").map(JSON.parse);
