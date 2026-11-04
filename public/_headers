@@ -1,0 +1,10 @@
+# Prerendered pages and static assets bypass the Astro middleware, so the
+# security headers below cover them at the asset layer. Rules merge with the
+# immutable Cache-Control block the Cloudflare adapter injects for /_astro/*.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+
+/login
+  Cache-Control: no-store
